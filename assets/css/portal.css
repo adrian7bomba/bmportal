@@ -1,0 +1,712 @@
+.bm-btn {
+    display: inline-block;
+    padding: 16px 40px;
+    border-radius: 16px;
+    font-weight: 600;
+    text-decoration: none !important;
+}
+
+.bm-btn-yellow {
+    background-color: #FFD700;
+    color: #1B2A4E;
+}
+
+.bm-btn-yellow:hover {
+    background-color: #1B2A4E;
+    color: #FFD700;
+}
+
+.bm-box {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 32px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.bm-box h3 {
+    margin-top: 0;
+}
+
+/* =========================
+   FORMULARZE (Moje konto)
+   ========================= */
+.bm-box--account{
+  border:1px solid rgba(0,0,0,0.08);
+}
+.bm-account-title{
+  margin:0 0 8px;
+}
+.bm-form{
+  background:#fff;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:16px;
+  padding:20px;
+  margin:0 0 24px;
+}
+.bm-form__section{
+  margin-bottom:24px;
+}
+.bm-form__h{
+  margin:0 0 14px;
+  font-size:18px;
+}
+.bm-grid{
+  display:grid;
+  gap:14px;
+}
+.bm-grid--2{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 860px){
+  .bm-grid--2{ grid-template-columns: 1fr; }
+}
+.bm-field label{
+  display:block;
+  font-weight:600;
+  margin:0 0 6px;
+}
+.bm-field input[type=text],
+.bm-field input[type=email],
+.bm-field input[type=url],
+.bm-field input[type=tel],
+.bm-field input[type=number],
+.bm-field select,
+.bm-field textarea{
+  width:100%;
+  border:1px solid rgba(0,0,0,0.2);
+  border-radius:10px;
+  padding:10px 12px;
+  outline:none;
+  background:#fff;
+}
+.bm-field textarea{ min-height:120px; }
+.bm-req{ color:#c62828; }
+.bm-help{
+  font-size:13px;
+  color:#546;
+  margin-top:6px;
+}
+.bm-help--tip{
+  background:#f7f7f7;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:12px;
+  padding:12px;
+  margin-top:10px;
+}
+.bm-alert{
+  border-radius:12px;
+  padding:12px 14px;
+  margin-top:12px;
+}
+.bm-alert ul{ margin:0; padding-left:18px; }
+.bm-alert--error{ background:#fff1f0; border:1px solid #ffccc7; }
+.bm-alert--success{ background:#f6ffed; border:1px solid #b7eb8f; }
+
+.bm-premium-note{
+  margin-top:8px;
+  font-size:13px;
+  color:#1B2A4E;
+}
+.bm-premium-note--green{
+  background:#e8f8e2;
+  border:1px solid #9ADB39;
+  border-radius:12px;
+  padding:10px 12px;
+}
+
+.bm-tax-tree{
+  border:1px solid rgba(0,0,0,0.12);
+  border-radius:12px;
+  padding:12px;
+  background:#fff;
+}
+.bm-tax-tree__list,
+.bm-tax-tree__children{
+  list-style:none;
+  padding-left:0;
+  margin:0;
+}
+.bm-tax-tree__children{ padding-left:18px; margin-top:6px; }
+.bm-tax-tree__item{ margin:6px 0; }
+.bm-tax-tree__label{ display:flex; gap:8px; align-items:center; }
+.bm-tax-tree__label.is-disabled{ opacity:0.5; }
+.bm-tax-tree__note{ margin-top:8px; font-size:12px; color:#666; }
+
+.bm-form__actions{
+  display:flex;
+  gap:12px;
+  margin-top:8px;
+}
+
+
+
+.bm-portfolio-loop{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.bm-portfolio-item{
+  background:#fff;
+  border-radius:16px;
+  padding:18px;
+  display:grid;
+  grid-template-columns: 320px 1fr;
+  gap:18px;
+}
+
+@media (max-width: 880px){
+  .bm-portfolio-item{
+    grid-template-columns: 1fr;
+  }
+}
+
+.bm-portfolio-title{
+  font-weight:700;
+  font-size:20px;
+  margin-bottom:8px;
+}
+
+.bm-portfolio-meta{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:12px;
+}
+
+.bm-portfolio-status,
+.bm-portfolio-category{
+  font-size:13px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:#f3f3f3;
+}
+
+.bm-portfolio-desc{
+  margin-bottom:12px;
+}
+
+.bm-portfolio-button{
+  display:inline-block;
+  padding:10px 14px;
+  border-radius:12px;
+  text-decoration:none;
+}
+
+
+
+/* =========================
+   PORTFOLIO – karty (wzór: białe tło + zaokrąglenia)
+   ========================= */
+.bm-portfolio-item{
+  background:#fff;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:18px;
+  padding:18px;
+  margin:0 0 16px;
+}
+
+.bm-portfolio-item .bm-portfolio-col{
+  width:100%;
+}
+
+.bm-portfolio-item .bm-portfolio-left{
+  margin-bottom:14px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+}
+
+
+.bm-portfolio-title{
+  font-weight:700;
+  font-size:18px;
+  margin:0 0 10px;
+}
+
+.bm-portfolio-meta-row,
+.bm-portfolio-rating,
+.bm-portfolio-recommend{
+  display:flex;
+  gap:8px;
+  margin:6px 0;
+}
+
+.bm-portfolio-meta-label{
+  font-weight:600;
+  opacity:0.85;
+  white-space:nowrap;
+}
+
+.bm-portfolio-badge{
+  display:inline-block;
+  margin-top:10px;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  background:#f3f3f3;
+}
+
+.bm-portfolio-desc{
+  margin:0 0 12px;
+}
+
+.bm-portfolio-gallery{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+  margin:0 0 14px;
+}
+@media (max-width: 560px){
+  .bm-portfolio-gallery{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+
+
+.bm-portfolio-gallery-link{
+  display:block;
+  border-radius:14px;
+  overflow:hidden;
+  border:1px solid rgba(0,0,0,0.08);
+}
+
+.bm-portfolio-gallery-img{
+  display:block;
+  width:100%;
+  aspect-ratio: 1 / 1;
+  height:auto;
+  object-fit:cover;
+}
+
+
+.bm-portfolio-button{
+  display:inline-block;
+  padding:12px 16px;
+  border-radius:14px;
+  background:#1B2A4E;
+  color:#fff !important;
+  text-decoration:none !important;
+  font-weight:600;
+}
+
+.bm-portfolio-button:hover{
+  opacity:0.92;
+}
+
+/* Układ 2 kolumny na desktop */
+@media (min-width: 768px){
+  .bm-portfolio-item{
+    display:flex;
+    gap:18px;
+    align-items:flex-start;
+  }
+  .bm-portfolio-item .bm-portfolio-left{
+    width:32%;
+    margin-bottom:0;
+  }
+  .bm-portfolio-item .bm-portfolio-right{
+    width:68%;
+  }
+}
+
+/* Lightbox */
+#bm-portfolio-lightbox{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.72);
+  display:none;
+  z-index:99999;
+  padding:24px;
+}
+#bm-portfolio-lightbox.is-open{ display:flex; align-items:center; justify-content:center; }
+#bm-portfolio-lightbox .bm-portfolio-lightbox-inner{
+  max-width:1100px;
+  width:100%;
+  max-height:90vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+#bm-portfolio-lightbox img{
+  max-width:100%;
+  max-height:90vh;
+  border-radius:18px;
+}
+html.bm-lightbox-open{ overflow:hidden; }
+
+/* === BrandManager: Portfolio enhancements (2026-01-15) === */
+.bm-portfolio-badge-portal{background:#9ADB39;color:#0E275E;font-weight:700;}
+.bm-portfolio-badge-external{background:#f2f2f2;color:#333;}
+.bm-portfolio-badge-none{background:#f2f2f2;color:#333;}
+
+/* Status: mocny wyróżnik w ramce */
+.bm-portfolio-badge-completed{
+  background:transparent;
+  color:#0E275E;
+  font-weight:800;
+  border:2px solid #9ADB39;
+}
+.bm-portfolio-badge-concept{background:transparent;color:#0E275E;font-weight:700;}
+
+.bm-portfolio-review-text{
+  margin-top:10px;padding:10px 12px;border-radius:12px;background:#fafafa;
+  border:1px solid rgba(0,0,0,0.06);font-size:16px;line-height:1.45;
+}
+
+.bm-portfolio-deal-hint{
+  margin-top:10px;padding:10px 12px;border-radius:12px;
+  background:rgba(42,255,213,0.14);border:1px solid rgba(14,39,94,0.10);
+  color:#0E275E;font-size:13px;font-weight:600;
+}
+
+/* 3 zdjęcia obok siebie + klikalny lightbox */
+.bm-portfolio-gallery{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+  margin:0 0 14px;
+}
+@media (max-width: 560px){
+  .bm-portfolio-gallery{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width:520px){.bm-portfolio-gallery{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+  margin:0 0 14px;
+}
+@media (max-width: 560px){
+  .bm-portfolio-gallery{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+}
+.bm-portfolio-gallery-link{width:100%;display:block;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,0.08);}
+.bm-portfolio-gallery-img{
+  display:block;
+  width:100%;
+  aspect-ratio: 1 / 1;
+  height:auto;
+  object-fit:cover;
+}
+
+
+
+/* === Portfolio fixes 2026-01-15c === */
+.bm-portfolio-status-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#f3f4f6;
+  margin:0 0 10px;
+}
+.bm-portfolio-status-line--completed{
+  border:2px solid #2E7D32;
+}
+.bm-portfolio-status-value{font-weight:700;color:#0E275E;}
+
+.bm-portfolio-badge{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.2;
+}
+.bm-portfolio-badge-portal{background:#9ADB39;color:#0E275E;}
+.bm-portfolio-badge-muted{background:#ececec;color:#333;}
+
+.bm-portfolio-review-details{
+  margin-top:6px;
+  font-size:14px;
+  color:#333;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+
+/* Portfolio: title for review details */
+.bm-portfolio-review-details-title{
+  margin-top:10px;
+  font-size:13px;
+  font-weight:700;
+  color:#0E275E;
+}
+
+/* Portfolio: collapsible description */
+.bm-portfolio-desc[data-collapsible="1"]{
+  position:relative;
+}
+.bm-portfolio-desc-toggle{
+  margin-top:8px;
+  background:transparent;
+  border:0;
+  padding:0;
+  font-weight:600;
+  cursor:pointer;
+  color:#1B2A4E;
+  text-decoration:underline;
+}
+.bm-portfolio-desc-toggle:hover,
+.bm-portfolio-desc-toggle:focus{
+  color:#FFD700;
+}
+
+.bm-portfolio-desc-toggle:focus{ outline:2px solid rgba(154,219,57,0.6); outline-offset:3px; border-radius:8px; }
+
+
+/* Lightbox nav */
+#bm-portfolio-lightbox.is-open{ display:flex; align-items:center; justify-content:center; }
+.bm-portfolio-lightbox-inner{ position:relative; }
+.bm-lb-prev,.bm-lb-next,.bm-lb-close{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  border:0;
+  background:rgba(255,255,255,0.16);
+  color:#fff;
+  padding:10px 12px;
+  border-radius:14px;
+  cursor:pointer;
+  font-size:18px;
+  line-height:1;
+}
+.bm-lb-prev{ left:-56px; }
+.bm-lb-next{ right:-56px; }
+.bm-lb-close{ top:-18px; right:-18px; transform:none; }
+@media (max-width: 700px){
+  .bm-lb-prev{ left:8px; }
+  .bm-lb-next{ right:8px; }
+  .bm-lb-close{ right:8px; top:8px; }
+}
+
+
+/* Rozwiń / Zwiń jako link (bez ramek/paddingu) */
+.bm-portfolio-toggle,
+button.bm-portfolio-toggle,
+a.bm-portfolio-toggle {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+
+  color: #1B2A4E !important;
+  text-decoration: underline !important;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline;
+}
+
+/* Hover/focus */
+.bm-portfolio-toggle:hover,
+.bm-portfolio-toggle:focus {
+  color: #FFD700 !important;
+  text-decoration: underline !important;
+  outline: none;
+}
+
+/* ================================
+   OPINIE – wyróżnienie źródła (portal vs external)
+   (shortcode: bm_reviews_detailed)
+================================ */
+
+/* Karta opinii */
+.bm-reviews-detailed .bm-review-card{
+  border: 1px solid #e6e8ee;
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: #fff;
+  margin: 0 0 14px 0;
+}
+
+/* Label źródła opinii – wspólne */
+.bm-reviews-detailed .bm-review-label{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  padding: 8px 12px;
+  border-radius: 999px;
+  margin: 0 0 10px 0;
+  white-space: nowrap;
+}
+
+/* ✅ Opinia z portalu BrandManager ★ (zielona jak w portfolio) */
+.bm-reviews-detailed .bm-review-label-portal{
+  background: #9ADB39;
+  color: #0E275E;
+  border: 2px solid rgba(14, 39, 94, 0.08);
+}
+
+/* ⚠️ Opinia spoza portalu (szara / niezweryfikowana) */
+.bm-reviews-detailed .bm-review-label-external{
+  background: #EEF1F5;
+  color: #1B2A4E;
+  border: 1px solid #D7DCE5;
+}
+
+/* Opcjonalnie: delikatna różnica w ramce całej karty */
+.bm-reviews-detailed .bm-review-card:has(.bm-review-label-portal){
+  border-color: rgba(154, 219, 57, 0.55);
+}
+.bm-reviews-detailed .bm-review-card:has(.bm-review-label-external){
+  border-color: rgba(215, 220, 229, 1);
+}
+
+/* Główka opinii */
+.bm-reviews-detailed .bm-review-head{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  margin: 0 0 10px 0;
+}
+
+.bm-reviews-detailed .bm-review-from{
+  color: #1B2A4E;
+  font-size: 14px;
+}
+.bm-reviews-detailed .bm-review-date{
+  opacity: .75;
+  margin-left: 8px;
+}
+
+.bm-reviews-detailed .bm-review-overall{
+  margin-left: auto;
+  color: #1B2A4E;
+  font-size: 14px;
+}
+
+/* Szczegóły */
+.bm-reviews-detailed .bm-review-details{
+  margin: 8px 0 10px 0;
+}
+.bm-reviews-detailed .bm-review-row{
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 2px 0;
+  color: #1B2A4E;
+}
+
+/* Treść opinii */
+.bm-reviews-detailed .bm-review-text{
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #F7F8FA;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #1B2A4E;
+}
+.bm-reviews-detailed .bm-review-text strong{
+  display: inline-block;
+  margin-right: 6px;
+}
+
+
+
+/* =========================
+   Artykuły dostawców (Moje konto)
+========================= */
+.woocommerce-MyAccount-navigation .bm-menu-premium > a{
+  position: relative;
+}
+.woocommerce-MyAccount-navigation .bm-menu-premium > a::after{
+  content: "TYLKO PREMIUM";
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #9ADB39;
+  color: #0E275E;
+  vertical-align: middle;
+}
+
+.bm-premium-note{
+  background:#9ADB39;
+  color:#0E275E;
+  padding:12px 14px;
+  border-radius:12px;
+  font-weight:600;
+  margin: 0 0 14px 0;
+}
+
+.bm-articles-head{ margin: 10px 0 14px; }
+
+.bm-status{
+  display:inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  background:#EEF1F5;
+  color:#1B2A4E;
+}
+.bm-status-pending{ background:#FFF4C2; }
+.bm-status-publish{ background:#DDF3C6; }
+.bm-status-bm_rejected{ background:#EEF1F5; }
+
+.bm-supplier-author-box{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.bm-supplier-author-link{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  text-decoration:none !important;
+}
+.bm-supplier-logo{
+  border-radius: 10px;
+  object-fit: cover;
+}
+.bm-supplier-name{
+  font-weight:700;
+  color:#1B2A4E;
+}
+
+
+.bm-supplier-author-header{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  padding:14px 16px;
+  border:1px solid #e6e8ee;
+  border-radius:14px;
+  background:#fff;
+}
+
+.bm-supplier-author-header__logo img{
+  width:56px;
+  height:56px;
+  object-fit:contain;
+  border-radius:12px;
+  background:#fff;
+}
+
+.bm-supplier-author-header__name{
+  font-weight:800;
+  font-size:16px;
+  color:#1B2A4E;
+  margin-bottom:4px;
+}
+
+.bm-supplier-author-link{
+  color:#1B2A4E;
+  text-decoration:underline;
+}
+.bm-supplier-author-link:hover{
+  color:#FFD700;
+}
+.bm-supplier-author-header__rating{
+  margin-top:8px;
+}

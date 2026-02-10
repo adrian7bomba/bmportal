@@ -1,0 +1,292 @@
+<?php
+/**
+ * Shortcodes dostawcy – scalone i uporządkowane
+ * - [dane_dostawcy]
+ * - [dostawca_pole]
+ * - [dostawca_obrazek]
+ * - [oferty_dostawcy]
+ * - [wszystkie_oferty_dostawcy]
+ */
+
+/* ==========================================================
+   1️⃣ Ustal ID dostawcy na podstawie kontekstu
+   ========================================================== */
+
+if ( ! function_exists( 'bm_get_current_supplier_post_id' ) ) {
+    function bm_get_current_supplier_post_id() {
+
+        global $post;
+
+        // 1) Jeśli mamy globalny post (loop Elementora)
+        if ( $post instanceof WP_Post ) {
+            $post_id   = $post->ID;
+            $post_type = get_post_type( $post_id );
+        } else {
+            // 2) Fallback – główny obiekt zapytania
+            $post_id   = get_queried_object_id();
+            $post_type = $post_id ? get_post_type( $post_id ) : '';
+        }
+
+        // Jesteśmy na wizytówce dostawcy
+        if ( $post_id && $post_type === 'dostawca' ) {
+            return (int) $post_id;
+        }
+
+        // Jesteśmy na ofercie → powiązany dostawca z ACF
+        if ( $post_id && $post_type === 'dostawca_oferta' && function_exists( 'get_field' ) ) {
+            $supplier = get_field( 'powiazany_dostawca', $post_id );
+
+            if ( is_object( $supplier ) && isset( $supplier->ID ) ) return (int) $supplier->ID;
+            if ( is_array( $supplier ) && isset( $supplier['ID'] ) ) return (int) $supplier['ID'];
+            if ( is_numeric( $supplier ) ) return (int) $supplier;
+        }
+
+        // Jeśli zalogowany user jest dostawcą – zwróć jego CPT
+        if ( is_user_logged_in() && function_exists( 'bm_get_or_create_supplier_post' ) ) {
+            $user = wp_get_current_user();
+            if ( in_array( 'dostawca', (array) $user->roles, true ) ) {
+                return (int) bm_get_or_create_supplier_post( $user->ID );
+            }
+        }
+
+        return 0;
+    }
+}
+
+/* ==========================================================
+   2️⃣ SHORTCODE: [dostawca_pole]
+   ========================================================== */
+
+add_shortcode( 'dostawca_pole', function( $atts ) {
+
+    $atts = shortcode_atts([
+        'klucz' => '',
+        'sep'   => ', ',
+    ], $atts );
+
+    $key = trim( $atts['klucz'] );
+    if ( ! $key ) return '';
+
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+
+    // Taksonomie dostawcy
+    $taxonomy_map = [
+        'lokalizacja_dostawca' => 'dostawca_lokalizacja',
+        'budzet_dostawca'      => 'dostawca_budzet',
+        'dostawca_budzety'     => 'dostawca_budzet',
+        'termin_dostawca'      => 'dostawca_termin',
+        'dostawca_terminy'     => 'dostawca_termin',
+    ];
+
+    if ( isset( $taxonomy_map[ $key ] ) ) {
+        $terms = wp_get_post_terms( $supplier_id, $taxonomy_map[ $key ] );
+        if ( is_wp_error($terms) || empty($terms) ) return '';
+        return esc_html( implode( $atts['sep'], wp_list_pluck( $terms, 'name' ) ) );
+    }
+
+    // Zwykłe pola ACF
+    $value = function_exists('get_field')
+        ? get_field( $key, $supplier_id )
+        : get_post_meta( $supplier_id, $key, true );
+
+    if ( empty( $value ) ) return '';
+
+    if ( is_array($value) ) {
+        if ( isset( $value['url'] ) ) return esc_url( $value['url'] ); // obrazek
+        return esc_html( implode( $atts['sep'], array_map( 'sanitize_text_field', $value ) ) );
+    }
+
+    return esc_html( $value );
+});
+
+/* ==========================================================
+   3️⃣ SHORTCODE: [dostawca_obrazek]
+   ========================================================== */
+
+add_shortcode( 'dostawca_obrazek', function( $atts ) {
+
+    $atts = shortcode_atts([
+        'klucz' => '',
+        'size'  => 'medium',
+        'class' => '',
+    ], $atts );
+
+    if ( empty( $atts['klucz'] ) ) return '';
+
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+
+    $field = function_exists('get_field')
+        ? get_field( $atts['klucz'], $supplier_id )
+        : get_post_meta( $supplier_id, $atts['klucz'], true );
+
+    if ( empty( $field ) ) return '';
+
+    // ACF Image (tablica)
+    if ( is_array( $field ) && isset( $field['ID'] ) ) {
+        return wp_get_attachment_image( $field['ID'], $atts['size'], false, [
+            'class' => 'dostawca-obrazek ' . esc_attr( $atts['class'] ),
+        ]);
+    }
+
+    // ID załącznika
+    if ( is_numeric( $field ) ) {
+        return wp_get_attachment_image( (int)$field, $atts['size'], false, [
+            'class' => 'dostawca-obrazek ' . esc_attr( $atts['class'] ),
+        ]);
+    }
+
+    // surowy URL
+    if ( is_string( $field ) ) {
+        return '<img src="'.esc_url($field).'" class="dostawca-obrazek '.esc_attr($atts['class']).'">';
+    }
+
+    return '';
+});
+
+/* ==========================================================
+   4️⃣ SHORTCODE: [dane_dostawcy]
+   ========================================================== */
+
+add_shortcode( 'dane_dostawcy', function( $atts ) {
+
+    $atts = shortcode_atts([
+        'pole'  => '',
+        'typ'   => '',
+        'class' => '',
+        'style' => '',
+    ], $atts );
+
+    if ( empty( $atts['pole'] ) ) return '';
+
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+
+    $value = function_exists('get_field') ? get_field( $atts['pole'], $supplier_id ) : '';
+
+    if ( empty( $value ) ) return '';
+
+    // obrazek
+    if ( $atts['typ'] === 'image' ) {
+
+        $url = '';
+
+        if ( is_array($value) && isset($value['url']) ) $url = $value['url'];
+        elseif ( is_numeric($value) ) $url = wp_get_attachment_url( $value );
+        elseif ( is_string($value) ) $url = $value;
+
+        if ( ! $url ) return '';
+
+        $style = $atts['style'] ?: 'height:80px;width:auto;';
+        return '<img src="'.esc_url($url).'" class="'.esc_attr($atts['class']).'" style="'.esc_attr($style).'">';
+    }
+
+    // tekst
+    if ( is_scalar($value) ) return esc_html($value);
+
+    return '';
+});
+
+/* ==========================================================
+   5️⃣ SHORTCODE: [oferty_dostawcy]
+   ========================================================== */
+
+add_shortcode( 'oferty_dostawcy', function( $atts ) {
+
+    $atts = shortcode_atts([
+        'limit' => 3,
+        'class' => '',
+    ], $atts );
+
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+
+    $current_offer = is_singular('dostawca_oferta') ? get_the_ID() : 0;
+
+    $q = new WP_Query([
+        'post_type'      => 'dostawca_oferta',
+        'posts_per_page' => (int) $atts['limit'],
+        'post_status'    => 'publish',
+        'meta_query'     => [
+            [
+                'key'     => 'powiazany_dostawca',
+                'value'   => $supplier_id,
+                'compare' => '=',
+            ]
+        ],
+        'post__not_in' => $current_offer ? [ $current_offer ] : [],
+    ]);
+
+    if ( ! $q->have_posts() ) return '';
+
+    ob_start();
+    echo '<div class="lista-ofert-dostawcy '.esc_attr($atts['class']).'">';
+
+    while ( $q->have_posts() ) {
+        $q->the_post();
+
+        echo '<div class="oferta-box">';
+        if ( $thumb = get_the_post_thumbnail_url( get_the_ID(), 'medium' ) ) {
+            echo '<div class="oferta-thumb"><img src="'.esc_url($thumb).'"></div>';
+        }
+        echo '<h4>'.esc_html(get_the_title()).'</h4>';
+        echo '<a href="'.esc_url(get_permalink()).'" class="button">Zobacz ofertę</a>';
+        echo '</div>';
+    }
+
+    echo '</div>';
+    wp_reset_postdata();
+    return ob_get_clean();
+});
+
+/* ==========================================================
+   6️⃣ SHORTCODE: [wszystkie_oferty_dostawcy] – Loop Template Elementor
+   ========================================================== */
+
+add_shortcode( 'wszystkie_oferty_dostawcy', function( $atts ) {
+
+    $atts = shortcode_atts([
+        'limit' => -1,
+    ], $atts );
+
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '<p>Brak ofert.</p>';
+
+    $user_id = (int) get_post_field('post_author', $supplier_id);
+    if ( ! $user_id ) return '<p>Brak ofert.</p>';
+
+    $q = new WP_Query([
+        'post_type'      => 'dostawca_oferta',
+        'post_status'    => 'publish',
+        'author'         => $user_id,
+        'posts_per_page' => (int) $atts['limit'],
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    ]);
+
+    if ( ! $q->have_posts() ) return '<p>Brak ofert.</p>';
+
+    $loop_template_id = 520;
+
+    if ( class_exists('\Elementor\Core\Files\CSS\Post') ) {
+        $css_file = new \Elementor\Core\Files\CSS\Post( $loop_template_id );
+        $css_file->enqueue();
+    }
+
+    if ( ! class_exists('\Elementor\Plugin') ) {
+        return '<p>Elementor nieaktywny.</p>';
+    }
+
+    ob_start();
+    echo '<div class="oferty-grid-elementor">';
+
+    while ( $q->have_posts() ) {
+        $q->the_post();
+        echo \Elementor\Plugin::$instance->frontend->get_builder_content_for_display( $loop_template_id );
+    }
+
+    echo '</div>';
+    wp_reset_postdata();
+    return ob_get_clean();
+});

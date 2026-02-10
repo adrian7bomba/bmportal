@@ -184,6 +184,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
             if ($postcode === '') $errors[] = 'Podaj kod pocztowy.';
             if ($city === '') $errors[] = 'Podaj miejscowość.';
             if ($nip_raw === '' || strlen($nip_raw) !== 10) $errors[] = 'Podaj poprawny NIP (10 cyfr).';
+            if (!bm_post('bm_confirm_company_data')) $errors[] = 'Potwierdź poprawność danych firmy przed wysłaniem.';
 
             // Profil
             $www          = esc_url_raw(bm_post('bm_company_www'));
@@ -346,7 +347,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-grid bm-grid--2">';
 
     echo '<div class="bm-field bm-field--company-name"><label>Nazwa firmy <span class="bm-req">*</span></label><input type="text" name="bm_company_name" value="'.esc_attr($v_company_name).'" required></div>';
-    echo '<div class="bm-field bm-field--nip"><label>NIP <span class="bm-req">*</span></label><input type="text" name="bm_company_nip" value="'.esc_attr($v_nip).'" inputmode="numeric" required></div>';
+    echo '<div class="bm-field bm-field--nip"><label>NIP <span class="bm-req">*</span></label><div class="bm-nip-inline"><input type="text" name="bm_company_nip" value="'.esc_attr($v_nip).'" inputmode="numeric" required><button type="button" class="button bm-btn-nip-fetch" data-nonce="'.esc_attr(wp_create_nonce('bm_nip_test_nonce')).'">Pobierz dane</button></div><div class="bm-help bm-help--nip-status"></div></div>';
     echo '<div class="bm-field bm-field--street"><label>Ulica i numer <span class="bm-req">*</span></label><input type="text" name="bm_company_street" value="'.esc_attr($v_street).'" required></div>';
     echo '<div class="bm-field bm-field--postcode"><label>Kod pocztowy <span class="bm-req">*</span></label><input type="text" name="bm_company_postcode" value="'.esc_attr($v_postcode).'" required></div>';
     echo '<div class="bm-field bm-field--city"><label>Miejscowość <span class="bm-req">*</span></label><input type="text" name="bm_company_city" value="'.esc_attr($v_city).'" required></div>';
@@ -414,6 +415,11 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<label>Opisz nagrody</label><textarea name="bm_awarded_text" rows="4">'.esc_textarea($v_awarded_text).'</textarea></div>';
     echo '</div>';
 
+    $confirm_checked = (!empty($_POST['bm_confirm_company_data']) || $_SERVER['REQUEST_METHOD'] !== 'POST') ? 1 : 0;
+    echo '<div class="bm-field bm-field--confirm">';
+    echo '<label><input type="checkbox" name="bm_confirm_company_data" value="1" '.checked($confirm_checked,1,false).' required> Potwierdzam poprawność danych firmy i NIP.</label>';
+    echo '</div>';
+
     echo '</div>'; // section
 
     echo '<div class="bm-form__actions">';
@@ -442,6 +448,57 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
       var aw = document.querySelector("input[name=bm_awarded]");
       var box = document.querySelector(".bm-field--awarded-text");
       if(aw && box){ aw.addEventListener("change", function(){ box.style.display = this.checked?"block":"none"; }); }
+
+      var form = document.querySelector(".bm-form--supplier");
+      var nipButton = document.querySelector(".bm-btn-nip-fetch");
+      if(form && nipButton){
+        var nipInput = form.querySelector("input[name=bm_company_nip]");
+        var statusEl = form.querySelector(".bm-help--nip-status");
+        var companyInput = form.querySelector("input[name=bm_company_name]");
+        var streetInput = form.querySelector("input[name=bm_company_street]");
+        var postcodeInput = form.querySelector("input[name=bm_company_postcode]");
+        var cityInput = form.querySelector("input[name=bm_company_city]");
+        var ajaxUrl = "' . esc_js(admin_url('admin-ajax.php')) . '";
+
+        nipButton.addEventListener("click", function(){
+          var nip = (nipInput && nipInput.value ? nipInput.value : "").replace(/\D+/g, "");
+          if(nip.length !== 10){
+            if(statusEl){ statusEl.textContent = "Wpisz poprawny NIP (10 cyfr)."; }
+            return;
+          }
+
+          if(statusEl){ statusEl.textContent = "Pobieram dane z rejestru..."; }
+          nipButton.disabled = true;
+
+          var fd = new FormData();
+          fd.append("action", "bm_nip_lookup");
+          fd.append("nonce", nipButton.getAttribute("data-nonce") || "");
+          fd.append("nip", nip);
+
+          fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+            .then(function(resp){ return resp.json(); })
+            .then(function(json){
+              if(!json || !json.success){
+                var msg = (json && json.data && json.data.message) ? json.data.message : "Nie udało się pobrać danych. Uzupełnij ręcznie.";
+                if(statusEl){ statusEl.textContent = msg; }
+                return;
+              }
+
+              var data = (json.data && json.data.data) ? json.data.data : {};
+              if(companyInput && data.company_name && !companyInput.value){ companyInput.value = data.company_name; }
+              if(streetInput && data.street && !streetInput.value){ streetInput.value = data.street; }
+              if(postcodeInput && data.postal_code && !postcodeInput.value){ postcodeInput.value = data.postal_code; }
+              if(cityInput && data.city && !cityInput.value){ cityInput.value = data.city; }
+              if(statusEl){ statusEl.textContent = "Dane pobrane. Sprawdź i potwierdź przed zapisaniem."; }
+            })
+            .catch(function(){
+              if(statusEl){ statusEl.textContent = "Błąd połączenia. Uzupełnij dane ręcznie."; }
+            })
+            .finally(function(){
+              nipButton.disabled = false;
+            });
+        });
+      }
     })();</script>';
 });
 
@@ -471,14 +528,10 @@ add_action('edit_user_profile', function($user){
     echo '</select>';
 
     $public_link = get_permalink($post_id);
-    $edit_post_link = get_edit_post_link($post_id,'');
     echo '<p class="description">';
     echo 'Aktualny status: <strong>'.esc_html($status).'</strong>. ';
     if ($public_link && $status === 'publish'){
         echo 'Publiczna wizytówka: <a href="'.esc_url($public_link).'" target="_blank">'.esc_html($public_link).'</a><br>';
-    }
-    if ($edit_post_link){
-        echo 'Edycja wpisu "dostawca": <a href="'.esc_url($edit_post_link).'" target="_blank">Otwórz w nowej karcie</a>';
     }
     echo '</p>';
 

@@ -126,6 +126,7 @@ $bm_registration_shortcodes = [
     'bm_miejscowosc_firmy'     => 'miejscowosc_dostawca',
     'bm_www_firmy'             => 'www_dostawca',
     'bm_slogan_firmy'          => 'slogan_dostawca',
+    'bm_realizujemy_na_cito'   => 'bm_cito_now',
     'bm_opis_firmy'            => 'opis_dostawca',
     'bm_wielkosc_firmy'        => 'wielkosc_firmy_dostawca',
     'bm_opiekun_nazwa'         => 'opiekun_imie_nazwisko',
@@ -145,6 +146,10 @@ foreach ( $bm_registration_shortcodes as $shortcode => $meta_key ) {
 
         if ( $meta_key === 'opis_dostawca' || $meta_key === 'nagradzani_opis' ) {
             return wp_kses_post( wpautop( (string) $value ) );
+        }
+
+        if ( $meta_key === 'bm_cito_now' ) {
+            return ((int) $value === 1) ? 'Tak' : 'Nie';
         }
 
         return esc_html( is_scalar( $value ) ? (string) $value : '' );

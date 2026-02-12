@@ -187,6 +187,19 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $errors = [];
     $success = '';
 
+    // SZYBKA AKTUALIZACJA: tylko flaga CITO (bez wysyłki do akceptacji)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bm_supplier_cito_only'])){
+        if (!isset($_POST['_bm_cito_nonce']) || !wp_verify_nonce($_POST['_bm_cito_nonce'], 'bm_supplier_cito_only')){
+            $errors[] = 'Błąd zabezpieczeń formularza CITO. Odśwież stronę i spróbuj ponownie.';
+        } else {
+            $cito_now = bm_post('bm_cito_now') ? 1 : 0;
+            bm_set_supplier_field($post_id, 'bm_cito_now', $cito_now);
+            $success = $cito_now
+                ? 'Status „Realizujemy na CITO” został włączony.'
+                : 'Status „Realizujemy na CITO” został wyłączony.';
+        }
+    }
+
     // ZAPIS FORMULARZA (KROK 2)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bm_supplier_step2']) ){
         if (!isset($_POST['_bm_nonce']) || !wp_verify_nonce($_POST['_bm_nonce'], 'bm_supplier_step2')){
@@ -344,6 +357,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                       . '<strong>NIP:</strong> '.esc_html($nip_raw).'<br>'
                       . '<strong>Adres:</strong> '.esc_html($street.', '.$postcode.' '.$city).'<br>'
                       . '<strong>Status VAT:</strong> '.esc_html(sanitize_text_field(bm_post('bm_company_vat_status'))).'</p>'
+                      . '<p><strong>Realizujemy na CITO:</strong> '.esc_html((int) bm_get_supplier_field($post_id, 'bm_cito_now', 0) === 1 ? 'Tak' : 'Nie').'</p>'
                       . '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop($desc)).'</p>'
                       . '<p><strong>Branże:</strong> '.esc_html(!empty($industries_names) ? implode(', ', $industries_names) : '—').'<br>'
                       . '<strong>Specjalizacje:</strong> '.esc_html(!empty($specializations_names) ? implode(', ', $specializations_names) : '—').'<br>'
@@ -425,6 +439,17 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $v_krs          = bm_get_supplier_field($post_id,'krs_dostawca','');
     $v_vat_status   = bm_get_supplier_field($post_id,'vat_status_dostawca','');
     $v_legal_form   = bm_get_supplier_field($post_id,'forma_prawna_dostawca','');
+    $v_cito_now     = (int) bm_get_supplier_field($post_id,'bm_cito_now',0);
+
+    echo '<form class="bm-form bm-form--supplier-cito" method="post">';
+    echo '<input type="hidden" name="bm_supplier_cito_only" value="1">';
+    wp_nonce_field('bm_supplier_cito_only','_bm_cito_nonce');
+    echo '<div class="bm-field bm-field--cito">';
+    echo '<label><input type="checkbox" name="bm_cito_now" value="1" '.checked($v_cito_now,1,false).'> <strong>Realizujemy na CITO</strong></label>';
+    echo '<div class="bm-help">Zaznaczając ten box jesteś widoczny w wynikach „na już”. Tę opcję możesz włączać/wyłączać niezależnie – bez wysyłki danych do ponownej akceptacji.</div>';
+    echo '</div>';
+    echo '<div class="bm-form__actions"><button type="submit" class="button bm-btn-submit">Zapisz status CITO</button></div>';
+    echo '</form>';
 
     echo '<form class="bm-form bm-form--supplier" method="post" enctype="multipart/form-data">';
     echo '<input type="hidden" name="bm_supplier_step2" value="1">';
@@ -747,6 +772,7 @@ add_action('edit_user_profile', function($user){
     echo '<div style="border:1px solid #EE2356;border-radius:10px;padding:12px;background:#fff7f9">';
     echo '<p><strong>Firma:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'nazwa_dostawca','—')).'</p>';
     echo '<p><strong>Slogan:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'slogan_dostawca','—')).'</p>';
+    echo '<p><strong>Realizujemy na CITO:</strong> '.esc_html((int) bm_get_supplier_field($post_id,'bm_cito_now',0) === 1 ? 'Tak' : 'Nie').'</p>';
     echo '<p><strong>Adres:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'ulica_dostawca','')).', '.esc_html((string) bm_get_supplier_field($post_id,'kod_pocztowy_dostawca','')).' '.esc_html((string) bm_get_supplier_field($post_id,'miejscowosc_dostawca','')).'</p>';
     echo '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop((string) bm_get_supplier_field($post_id,'opis_dostawca',''))).'</p>';
     $admin_spec = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);

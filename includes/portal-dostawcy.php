@@ -133,10 +133,16 @@ function bm_render_tax_tree($taxonomy, $name, $selected_ids = [], $max = 3){
             'order'      => 'ASC',
         ]);
         $is_checked = in_array((int)$term->term_id, $selected_ids, true);
+        $is_parent_only = !is_wp_error($children) && !empty($children);
         echo '<li class="bm-tax-tree__item">';
         echo '<label class="bm-tax-tree__label">';
-        echo '<input class="bm-tax-tree__checkbox" type="checkbox" name="'.esc_attr($name).'[]" value="'.esc_attr($term->term_id).'" '.checked($is_checked,true,false).'> ';
-        echo '<span>'.esc_html($term->name).'</span>';
+        if ($is_parent_only){
+            echo '<input class="bm-tax-tree__checkbox" type="checkbox" disabled aria-disabled="true"> ';
+            echo '<span class="bm-tax-tree__parent">'.esc_html($term->name).'</span>';
+        } else {
+            echo '<input class="bm-tax-tree__checkbox" type="checkbox" name="'.esc_attr($name).'[]" value="'.esc_attr($term->term_id).'" '.checked($is_checked,true,false).'> ';
+            echo '<span>'.esc_html($term->name).'</span>';
+        }
         echo '</label>';
         if (!is_wp_error($children) && !empty($children)){
             echo '<ul class="bm-tax-tree__children">';
@@ -226,6 +232,10 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 bm_set_supplier_field($post_id, 'kod_pocztowy_dostawca', $postcode);
                 bm_set_supplier_field($post_id, 'miejscowosc_dostawca', $city);
                 bm_set_supplier_field($post_id, 'nip_dostawca', $nip_raw);
+                bm_set_supplier_field($post_id, 'regon_dostawca', sanitize_text_field(bm_post('bm_company_regon')));
+                bm_set_supplier_field($post_id, 'krs_dostawca', sanitize_text_field(bm_post('bm_company_krs')));
+                bm_set_supplier_field($post_id, 'vat_status_dostawca', sanitize_text_field(bm_post('bm_company_vat_status')));
+                bm_set_supplier_field($post_id, 'forma_prawna_dostawca', sanitize_text_field(bm_post('bm_company_legal_form')));
 
                 bm_set_supplier_field($post_id, 'www_dostawca', $www);
                 bm_set_supplier_field($post_id, 'opis_dostawca', $desc);
@@ -243,8 +253,9 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 bm_set_supplier_field($post_id, 'bm_specializations', $spec_ids);
                 wp_set_object_terms($post_id, $spec_ids, 'dostawca_kategoria', false);
 
-                // branże – meta (oddzielnie)
+                // branże – meta + termy
                 bm_set_supplier_field($post_id, 'bm_industries', $ind_ids);
+                wp_set_object_terms($post_id, $ind_ids, 'dostawca_branza', false);
 
                 if (is_int($logo_upload) && $logo_upload > 0){
                     bm_set_supplier_field($post_id, 'logo_dostawca', $logo_upload);
@@ -275,10 +286,8 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                       . '<p>Wykonawca <strong>'.esc_html($user->user_email).'</strong> zaktualizował dane firmy.</p>'
                       . '<p><strong>Nazwa firmy:</strong> '.esc_html($company_name).'<br>'
                       . '<strong>NIP:</strong> '.esc_html($nip_raw).'</p>'
-                      . '<p style="margin:12px 0">'
-                      . '<a href="'.esc_url($user_panel_link).'" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#1B2A4E;color:#fff;text-decoration:none">Profil użytkownika</a> '
-                      . ($supplier_post_link ? '<a href="'.esc_url($supplier_post_link).'" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#FFD700;color:#1B2A4E;text-decoration:none;margin-left:8px">Edycja wizytówki</a>' : '')
-                      . '</p>'
+                      . '<p><strong>Profil użytkownika:</strong> '.esc_html($user_panel_link).'</p>'
+                      . ($supplier_post_link ? '<p><strong>Link do edycji wizytówki:</strong> '.esc_html($supplier_post_link).'</p>' : '')
                       . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
                       . '<p style="color:#666;font-size:12px;margin:0">BrandManager – powiadomienie systemowe.</p>'
                       . '</div></div>';
@@ -310,6 +319,10 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
         }
     } elseif ($status === 'rejected'){
         echo '<p>Status: <strong>Do poprawy</strong> – popraw dane i wyślij ponownie do akceptacji.</p>';
+        $reject_reason = get_user_meta($user->ID, 'bm_supplier_reject_reason', true);
+        if ($reject_reason){
+            echo '<div class="bm-alert bm-alert--error bm-reject-reason"><strong>Powód odrzucenia:</strong><br>'.wp_kses_post(nl2br(esc_html($reject_reason))).'</div>';
+        }
     }
     if (!empty($errors)){
         echo '<div class="bm-alert bm-alert--error"><ul>'; foreach($errors as $e){ echo '<li>'.esc_html($e).'</li>'; } echo '</ul></div>';
@@ -336,6 +349,10 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $v_awarded_text = bm_get_supplier_field($post_id,'nagradzani_opis','');
     $v_spec         = bm_get_supplier_field($post_id,'bm_specializations',[]);
     $v_ind          = bm_get_supplier_field($post_id,'bm_industries',[]);
+    $v_regon        = bm_get_supplier_field($post_id,'regon_dostawca','');
+    $v_krs          = bm_get_supplier_field($post_id,'krs_dostawca','');
+    $v_vat_status   = bm_get_supplier_field($post_id,'vat_status_dostawca','');
+    $v_legal_form   = bm_get_supplier_field($post_id,'forma_prawna_dostawca','');
 
     echo '<form class="bm-form bm-form--supplier" method="post" enctype="multipart/form-data">';
     echo '<input type="hidden" name="bm_supplier_step2" value="1">';
@@ -347,7 +364,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-grid bm-grid--2">';
 
     echo '<div class="bm-field bm-field--company-name"><label>Nazwa firmy <span class="bm-req">*</span></label><input type="text" name="bm_company_name" value="'.esc_attr($v_company_name).'" required></div>';
-    echo '<div class="bm-field bm-field--nip"><label>NIP <span class="bm-req">*</span></label><div class="bm-nip-inline"><input type="text" name="bm_company_nip" value="'.esc_attr($v_nip).'" inputmode="numeric" required><button type="button" class="button bm-btn-nip-fetch" data-nonce="'.esc_attr(wp_create_nonce('bm_nip_test_nonce')).'">Pobierz dane</button></div><div class="bm-help bm-help--nip-status"></div></div>';
+    echo '<div class="bm-field bm-field--nip"><label>NIP <span class="bm-req">*</span></label><div class="bm-nip-inline"><input type="text" name="bm_company_nip" value="'.esc_attr($v_nip).'" inputmode="numeric" required><button type="button" class="button bm-btn-nip-fetch" data-nonce="'.esc_attr(wp_create_nonce('bm_company_lookup_nonce')).'">Pobierz dane</button></div><div class="bm-help bm-help--nip-status"></div></div>';
     echo '<div class="bm-field bm-field--street"><label>Ulica i numer <span class="bm-req">*</span></label><input type="text" name="bm_company_street" value="'.esc_attr($v_street).'" required></div>';
     echo '<div class="bm-field bm-field--postcode"><label>Kod pocztowy <span class="bm-req">*</span></label><input type="text" name="bm_company_postcode" value="'.esc_attr($v_postcode).'" required></div>';
     echo '<div class="bm-field bm-field--city"><label>Miejscowość <span class="bm-req">*</span></label><input type="text" name="bm_company_city" value="'.esc_attr($v_city).'" required></div>';
@@ -404,7 +421,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     bm_render_tax_tree('dostawca_kategoria','bm_specializations',$v_spec,3);
     echo '</div>';
     echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max 3)</label>';
-    bm_render_tax_tree('dostawca_kategoria','bm_industries',$v_ind,3);
+    bm_render_tax_tree('dostawca_branza','bm_industries',$v_ind,3);
     echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> branż.</div>';
     echo '</div>';
     echo '</div>';
@@ -412,7 +429,14 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-field bm-field--awarded">';
     echo '<label><input type="checkbox" name="bm_awarded" value="1" '.checked($v_awarded,1,false).'> Nagradzani w konkursach</label>';
     echo '<div class="bm-field bm-field--awarded-text" style="margin-top:10px;'.($v_awarded? '':'display:none;').'">';
-    echo '<label>Opisz nagrody</label><textarea name="bm_awarded_text" rows="4">'.esc_textarea($v_awarded_text).'</textarea></div>';
+    echo '<label>Opisz nagrody</label>';
+    wp_editor($v_awarded_text, 'bm_awarded_text_editor', [
+        'textarea_name' => 'bm_awarded_text',
+        'media_buttons' => false,
+        'teeny'         => true,
+        'textarea_rows' => 5,
+    ]);
+    echo '</div>';
     echo '</div>';
 
     $confirm_checked = (!empty($_POST['bm_confirm_company_data']) || $_SERVER['REQUEST_METHOD'] !== 'POST') ? 1 : 0;
@@ -458,7 +482,26 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
         var streetInput = form.querySelector("input[name=bm_company_street]");
         var postcodeInput = form.querySelector("input[name=bm_company_postcode]");
         var cityInput = form.querySelector("input[name=bm_company_city]");
+        var regonInput = form.querySelector("input[name=bm_company_regon]");
+        var krsInput = form.querySelector("input[name=bm_company_krs]");
+        var vatInput = form.querySelector("input[name=bm_company_vat_status]");
+        var legalInput = form.querySelector("input[name=bm_company_legal_form]");
+        var photoInput = form.querySelector("input[name=bm_company_photo]");
+        var photoPreview = form.querySelector(".bm-photo-preview");
         var ajaxUrl = "' . esc_js(admin_url('admin-ajax.php')) . '";
+
+        if(photoInput && photoPreview){
+          photoInput.addEventListener("change", function(){
+            var file = this.files && this.files[0] ? this.files[0] : null;
+            if(!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e){
+              photoPreview.style.backgroundImage = "url(" + e.target.result + ")";
+              photoPreview.classList.add("is-filled");
+            };
+            reader.readAsDataURL(file);
+          });
+        }
 
         nipButton.addEventListener("click", function(){
           var nip = (nipInput && nipInput.value ? nipInput.value : "").replace(/\D+/g, "");
@@ -471,7 +514,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
           nipButton.disabled = true;
 
           var fd = new FormData();
-          fd.append("action", "bm_nip_lookup");
+          fd.append("action", "bm_company_lookup");
           fd.append("nonce", nipButton.getAttribute("data-nonce") || "");
           fd.append("nip", nip);
 
@@ -489,6 +532,10 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
               if(streetInput && data.street && !streetInput.value){ streetInput.value = data.street; }
               if(postcodeInput && data.postal_code && !postcodeInput.value){ postcodeInput.value = data.postal_code; }
               if(cityInput && data.city && !cityInput.value){ cityInput.value = data.city; }
+              if(regonInput){ regonInput.value = data.regon || ""; }
+              if(krsInput){ krsInput.value = data.krs || ""; }
+              if(vatInput){ vatInput.value = data.status_vat || ""; }
+              if(legalInput){ legalInput.value = data.legal_form || ""; }
               if(statusEl){ statusEl.textContent = "Dane pobrane. Sprawdź i potwierdź przed zapisaniem."; }
             })
             .catch(function(){
@@ -526,6 +573,8 @@ add_action('edit_user_profile', function($user){
     echo '<option value="publish" '.selected($status,'publish',false).'>Zaakceptowane</option>';
     echo '<option value="rejected" '.selected($status,'rejected',false).'>Odrzucone</option>';
     echo '</select>';
+    $reject_reason_admin = get_user_meta($user->ID, 'bm_supplier_reject_reason', true);
+    echo '<p style="margin-top:8px"><label for="bm_supplier_reject_reason"><strong>Powód odrzucenia (opcjonalnie)</strong></label><br><textarea name="bm_supplier_reject_reason" id="bm_supplier_reject_reason" rows="4" style="width:100%;max-width:640px">'.esc_textarea($reject_reason_admin).'</textarea></p>';
 
     $public_link = get_permalink($post_id);
     echo '<p class="description">';
@@ -630,7 +679,7 @@ add_action('edit_user_profile', function($user){
     }
 
     echo '</tbody></table>';
-});
+}, 1);
 
 /* Zapis decyzji superadmina */
 add_action('personal_options_update','bm_save_supplier_admin_decision');
@@ -643,12 +692,13 @@ function bm_save_supplier_admin_decision($user_id){
     $user_id = (int)$user_id;
     $post_id = bm_get_or_create_supplier_post($user_id);
 
-    $new_status = sanitize_text_field($_POST['bm_supplier_status']);
+$new_status = sanitize_text_field($_POST['bm_supplier_status']);
+    $reject_reason = isset($_POST['bm_supplier_reject_reason']) ? sanitize_textarea_field(wp_unslash($_POST['bm_supplier_reject_reason'])) : '';
     $allowed    = ['draft','pending','publish','rejected'];
     if (!in_array($new_status, $allowed, true)) return;
 
     $old_status = get_post_status($post_id);
-    if ($old_status === $new_status) return;
+if ($old_status === $new_status && $new_status !== 'rejected') return;
 
     wp_update_post([
         'ID'          => $post_id,
@@ -659,7 +709,8 @@ function bm_save_supplier_admin_decision($user_id){
     if (!$user) return;
 
     // Jeśli akceptacja → snapshot i mail
-    if ($new_status === 'publish'){
+if ($new_status === 'publish'){
+        update_user_meta($user_id, 'bm_supplier_reject_reason', '');
 
         if (function_exists('get_fields')){
             $fields = get_fields($post_id);
@@ -684,12 +735,14 @@ function bm_save_supplier_admin_decision($user_id){
         );
 
     } elseif ($new_status === 'rejected'){
+        update_user_meta($user_id, 'bm_supplier_reject_reason', $reject_reason);
 
         $html = '<div style="font-family:Arial,sans-serif;line-height:1.5">'
               . '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px;max-width:700px">'
               . '<h2 style="margin:0 0 10px">Twoje dane wymagają poprawek</h2>'
               . '<p>Twoje dane Wykonawcy zostały odrzucone.</p>'
               . '<p>Zaloguj się do panelu, popraw dane i wyślij je ponownie do akceptacji.</p>'
+              . (!empty($reject_reason) ? '<p><strong>Powód odrzucenia:</strong><br>' . nl2br(esc_html($reject_reason)) . '</p>' : '')
               . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
               . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna.</p>'
               . '</div></div>';

@@ -28,6 +28,25 @@ add_action( 'init', function() {
         ]
     );
 
+
+    // Doświadczenie w branżach
+    register_taxonomy(
+        'dostawca_branza',
+        $post_types,
+        [
+            'labels' => [
+                'name'          => 'Doświadczenie w branżach',
+                'singular_name' => 'Branża',
+            ],
+            'public'            => true,
+            'hierarchical'      => true,
+            'show_admin_column' => true,
+            'show_ui'           => true,
+            'show_in_rest'      => true,
+            'rewrite'           => [ 'slug' => 'branza-dostawcy' ],
+        ]
+    );
+
     // Lokalizacje
     register_taxonomy(
         'dostawca_lokalizacja',

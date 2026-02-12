@@ -710,3 +710,64 @@ a.bm-portfolio-toggle {
 .bm-supplier-author-header__rating{
   margin-top:8px;
 }
+
+:root{
+  --bm-brand-red:#EE2356;
+  --bm-brand-black:#1d1b1c;
+  --bm-brand-blue:#47c0c7;
+  --bm-brand-gray:#e8e9eb;
+  --bm-brand-navy:#282a36;
+  --bm-brand-darkgray:#44474e;
+}
+
+.bm-box--account,
+.bm-form{ border-color: var(--bm-brand-gray); }
+.bm-account-title,
+.bm-form__h{ color:var(--bm-brand-navy); }
+
+.bm-field input[type=text],
+.bm-field input[type=email],
+.bm-field input[type=url],
+.bm-field input[type=tel],
+.bm-field input[type=number],
+.bm-field select,
+.bm-field textarea{ border-color:var(--bm-brand-gray); color:var(--bm-brand-black); }
+
+.bm-field input:focus,
+.bm-field select:focus,
+.bm-field textarea:focus{
+  border-color:var(--bm-brand-blue);
+  box-shadow:0 0 0 3px rgba(71,192,199,.2);
+}
+
+.bm-btn-submit,
+.woocommerce .button.bm-btn-submit,
+.bm-btn-nip-fetch{
+  background:var(--bm-brand-red) !important;
+  border-color:var(--bm-brand-red) !important;
+  color:#fff !important;
+}
+
+.bm-btn-nip-fetch{ white-space:nowrap; }
+.bm-nip-inline{ display:flex; gap:8px; align-items:center; }
+
+.bm-tax-tree__parent{ color:var(--bm-brand-darkgray); font-weight:700; }
+.bm-tax-tree__checkbox[disabled]{ opacity:.45; cursor:not-allowed; }
+
+.bm-photo-preview{
+  margin-top:10px;
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  border:2px dashed var(--bm-brand-gray);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--bm-brand-darkgray);
+  background:#fff;
+  background-size:cover;
+  background-position:center;
+}
+.bm-photo-preview.is-filled span{ display:none; }
+
+.bm-reject-reason{ border-left:4px solid var(--bm-brand-red); }

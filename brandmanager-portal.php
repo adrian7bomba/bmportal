@@ -34,7 +34,7 @@ add_action( 'plugins_loaded', function() {
     require_once BM_PORTAL_PATH . 'includes/reviews.php';
     require_once BM_PORTAL_PATH . 'includes/portfolio.php';
     require_once BM_PORTAL_PATH . 'includes/supplier-posts.php';
-    require_once BM_PORTAL_PATH . 'includes/bm-nip-test-shortcode.php';
+    require_once BM_PORTAL_PATH . 'includes/company-registry.php';
 
 
 });

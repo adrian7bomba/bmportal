@@ -208,12 +208,18 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
 
             // Profil
             $www          = esc_url_raw(bm_post('bm_company_www'));
+            $slogan       = sanitize_text_field(bm_post('bm_company_slogan'));
             $desc         = wp_kses_post(bm_post('bm_company_description'));
             $size         = sanitize_text_field(bm_post('bm_company_size'));
             $op_name      = sanitize_text_field(bm_post('bm_contact_name'));
             $op_role      = sanitize_text_field(bm_post('bm_contact_role'));
             $op_email     = sanitize_email(bm_post('bm_contact_email'));
             $op_phone     = sanitize_text_field(bm_post('bm_contact_phone'));
+
+            if (mb_strlen($slogan) > 45){
+                $errors[] = 'Slogan firmy może mieć maksymalnie 45 znaków.';
+                $slogan = mb_substr($slogan, 0, 45);
+            }
 
             $awarded      = bm_post('bm_awarded') ? 1 : 0;
             $awarded_text = sanitize_textarea_field(bm_post('bm_awarded_text'));
@@ -233,6 +239,16 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 $errors[] = sprintf('Możesz wybrać maksymalnie %d branż doświadczenia.', $max_taxonomy_items);
                 $ind_ids = array_slice($ind_ids, 0, $max_taxonomy_items);
             }
+
+            $location_ids = array_map('intval', (array) bm_post('bm_locations', []));
+            $location_ids = array_values(array_filter($location_ids));
+            if (count($location_ids) > 3){
+                $errors[] = 'Możesz wybrać maksymalnie 3 lokalizacje.';
+                $location_ids = array_slice($location_ids, 0, 3);
+            }
+
+            $term_id = (int) bm_post('bm_term', 0);
+            $budget_id = (int) bm_post('bm_budget', 0);
 
             // Uploady (logo + zdjęcie firmy)
             $logo_upload = bm_handle_image_upload('bm_company_logo');
@@ -254,6 +270,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 bm_set_supplier_field($post_id, 'forma_prawna_dostawca', sanitize_text_field(bm_post('bm_company_legal_form')));
 
                 bm_set_supplier_field($post_id, 'www_dostawca', $www);
+                bm_set_supplier_field($post_id, 'slogan_dostawca', $slogan);
                 bm_set_supplier_field($post_id, 'opis_dostawca', $desc);
                 bm_set_supplier_field($post_id, 'wielkosc_firmy_dostawca', $size);
 
@@ -272,6 +289,16 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 // branże – meta + termy
                 bm_set_supplier_field($post_id, 'bm_industries', $ind_ids);
                 wp_set_object_terms($post_id, $ind_ids, 'dostawca_branza', false);
+
+                // lokalizacje/termin/budżet
+                bm_set_supplier_field($post_id, 'bm_locations', $location_ids);
+                wp_set_object_terms($post_id, $location_ids, 'dostawca_lokalizacja', false);
+
+                bm_set_supplier_field($post_id, 'bm_term', $term_id);
+                wp_set_object_terms($post_id, $term_id ? [$term_id] : [], 'dostawca_termin', false);
+
+                bm_set_supplier_field($post_id, 'bm_budget', $budget_id);
+                wp_set_object_terms($post_id, $budget_id ? [$budget_id] : [], 'dostawca_budzet', false);
 
                 if (is_int($logo_upload) && $logo_upload > 0){
                     bm_set_supplier_field($post_id, 'logo_dostawca', $logo_upload);
@@ -305,6 +332,9 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 $supplier_post_link = get_edit_post_link($post_id);
                 $specializations_names = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);
                 $industries_names = wp_get_post_terms($post_id, 'dostawca_branza', ['fields' => 'names']);
+                $locations_names = wp_get_post_terms($post_id, 'dostawca_lokalizacja', ['fields' => 'names']);
+                $terms_names = wp_get_post_terms($post_id, 'dostawca_termin', ['fields' => 'names']);
+                $budgets_names = wp_get_post_terms($post_id, 'dostawca_budzet', ['fields' => 'names']);
 
                 $html = '<div style="font-family:Arial,sans-serif;line-height:1.5">'
                       . '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px;max-width:700px">'
@@ -317,6 +347,9 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                       . '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop($desc)).'</p>'
                       . '<p><strong>Branże:</strong> '.esc_html(!empty($industries_names) ? implode(', ', $industries_names) : '—').'<br>'
                       . '<strong>Specjalizacje:</strong> '.esc_html(!empty($specializations_names) ? implode(', ', $specializations_names) : '—').'<br>'
+                      . '<strong>Lokalizacje:</strong> '.esc_html(!empty($locations_names) ? implode(', ', $locations_names) : '—').'<br>'
+                      . '<strong>Termin realizacji:</strong> '.esc_html(!empty($terms_names) ? implode(', ', $terms_names) : '—').'<br>'
+                      . '<strong>Budżet:</strong> '.esc_html(!empty($budgets_names) ? implode(', ', $budgets_names) : '—').'<br>'
                       . '<strong>Opiekun klienta:</strong> '.esc_html(trim($op_name.' / '.$op_role.' / '.$op_email.' / '.$op_phone, ' /')).'</p>'
                       . '<p><strong>Profil użytkownika:</strong> '.esc_html($user_panel_link).'</p>'
                       . ($supplier_post_link ? '<p><strong>Link do edycji wizytówki:</strong> '.esc_html($supplier_post_link).'</p>' : '')
@@ -374,6 +407,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $v_city         = bm_get_supplier_field($post_id,'miejscowosc_dostawca','');
     $v_nip          = bm_get_supplier_field($post_id,'nip_dostawca','');
     $v_www          = bm_get_supplier_field($post_id,'www_dostawca','');
+    $v_slogan       = bm_get_supplier_field($post_id,'slogan_dostawca','');
     $v_desc         = bm_get_supplier_field($post_id,'opis_dostawca','');
     $v_size         = bm_get_supplier_field($post_id,'wielkosc_firmy_dostawca','');
     $v_op_name      = bm_get_supplier_field($post_id,'opiekun_imie_nazwisko','');
@@ -384,6 +418,9 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $v_awarded_text = bm_get_supplier_field($post_id,'nagradzani_opis','');
     $v_spec         = bm_get_supplier_field($post_id,'bm_specializations',[]);
     $v_ind          = bm_get_supplier_field($post_id,'bm_industries',[]);
+    $v_locations    = bm_get_supplier_field($post_id,'bm_locations',[]);
+    $v_term         = (int) bm_get_supplier_field($post_id,'bm_term',0);
+    $v_budget       = (int) bm_get_supplier_field($post_id,'bm_budget',0);
     $v_regon        = bm_get_supplier_field($post_id,'regon_dostawca','');
     $v_krs          = bm_get_supplier_field($post_id,'krs_dostawca','');
     $v_vat_status   = bm_get_supplier_field($post_id,'vat_status_dostawca','');
@@ -422,6 +459,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
 
     echo '<div class="bm-grid bm-grid--2">';
     echo '<div class="bm-field bm-field--www"><label>Strona WWW</label><input type="url" name="bm_company_www" value="'.esc_attr($v_www).'" placeholder="https://..."></div>';
+    echo '<div class="bm-field bm-field--slogan"><label>Slogan firmy (max 45 znaków)</label><input type="text" name="bm_company_slogan" value="'.esc_attr($v_slogan).'" maxlength="45"></div>';
     echo '<div class="bm-field bm-field--size"><label>Wielkość firmy</label>';
     echo '<select name="bm_company_size">';
     $sizes = ['' => '— wybierz —','do 5 pracowników'=>'do 5 pracowników','5-10 pracowników'=>'5-10 pracowników','10-20 pracowników'=>'10-20 pracowników','ponad 20 pracowników'=>'ponad 20 pracowników'];
@@ -463,6 +501,38 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max '.(int)$max_taxonomy_items.')</label>';
     bm_render_tax_tree('dostawca_branza','bm_industries',$v_ind,$max_taxonomy_items);
     echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> branż.</div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="bm-grid bm-grid--2">';
+    echo '<div class="bm-field bm-field--locations"><label>Lokalizacje (max 3)</label>';
+    bm_render_tax_tree('dostawca_lokalizacja','bm_locations',$v_locations,3);
+    echo '</div>';
+
+    echo '<div class="bm-field bm-field--term"><label>Terminy realizacji (jedno do wyboru)</label>';
+    $term_options = get_terms(['taxonomy' => 'dostawca_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+    echo '<select name="bm_term">';
+    echo '<option value="0">— wybierz —</option>';
+    if (!is_wp_error($term_options)){
+        foreach($term_options as $term_opt){
+            echo '<option value="'.esc_attr((int)$term_opt->term_id).'" '.selected($v_term, (int)$term_opt->term_id, false).'>'.esc_html($term_opt->name).'</option>';
+        }
+    }
+    echo '</select>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="bm-grid bm-grid--2">';
+    echo '<div class="bm-field bm-field--budget"><label>Budżety (jedno do wyboru)</label>';
+    $budget_options = get_terms(['taxonomy' => 'dostawca_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+    echo '<select name="bm_budget">';
+    echo '<option value="0">— wybierz —</option>';
+    if (!is_wp_error($budget_options)){
+        foreach($budget_options as $budget_opt){
+            echo '<option value="'.esc_attr((int)$budget_opt->term_id).'" '.selected($v_budget, (int)$budget_opt->term_id, false).'>'.esc_html($budget_opt->name).'</option>';
+        }
+    }
+    echo '</select>';
     echo '</div>';
     echo '</div>';
 
@@ -676,12 +746,19 @@ add_action('edit_user_profile', function($user){
     echo '<tr><th>Dane do akceptacji</th><td>';
     echo '<div style="border:1px solid #EE2356;border-radius:10px;padding:12px;background:#fff7f9">';
     echo '<p><strong>Firma:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'nazwa_dostawca','—')).'</p>';
+    echo '<p><strong>Slogan:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'slogan_dostawca','—')).'</p>';
     echo '<p><strong>Adres:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'ulica_dostawca','')).', '.esc_html((string) bm_get_supplier_field($post_id,'kod_pocztowy_dostawca','')).' '.esc_html((string) bm_get_supplier_field($post_id,'miejscowosc_dostawca','')).'</p>';
     echo '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop((string) bm_get_supplier_field($post_id,'opis_dostawca',''))).'</p>';
     $admin_spec = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);
     $admin_ind = wp_get_post_terms($post_id, 'dostawca_branza', ['fields' => 'names']);
+    $admin_locations = wp_get_post_terms($post_id, 'dostawca_lokalizacja', ['fields' => 'names']);
+    $admin_term = wp_get_post_terms($post_id, 'dostawca_termin', ['fields' => 'names']);
+    $admin_budget = wp_get_post_terms($post_id, 'dostawca_budzet', ['fields' => 'names']);
     echo '<p><strong>Branże:</strong> '.esc_html(!empty($admin_ind) ? implode(', ', $admin_ind) : '—').'</p>';
     echo '<p><strong>Specjalizacje:</strong> '.esc_html(!empty($admin_spec) ? implode(', ', $admin_spec) : '—').'</p>';
+    echo '<p><strong>Lokalizacje:</strong> '.esc_html(!empty($admin_locations) ? implode(', ', $admin_locations) : '—').'</p>';
+    echo '<p><strong>Termin realizacji:</strong> '.esc_html(!empty($admin_term) ? implode(', ', $admin_term) : '—').'</p>';
+    echo '<p><strong>Budżet:</strong> '.esc_html(!empty($admin_budget) ? implode(', ', $admin_budget) : '—').'</p>';
     echo '<p><strong>Opiekun:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_imie_nazwisko','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_stanowisko','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_email','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_telefon','—')).'</p>';
     echo '</div>';
     echo '</td></tr>';
@@ -824,7 +901,7 @@ if ($new_status === 'publish'){
               . '<p>Twoje dane Wykonawcy zostały zaakceptowane przez administrację.</p>'
               . '<p>Twoja wizytówka jest już widoczna publicznie.</p>'
               . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
-              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna.</p>'
+              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna. Prosimy nie odpowiadać na tę wiadomość.</p>'
               . '</div></div>';
         bm_send_html_mail(
             $user->user_email,
@@ -843,7 +920,7 @@ if ($new_status === 'publish'){
               . '<p>Zaloguj się do panelu, popraw dane i wyślij je ponownie do akceptacji.</p>'
               . (!empty($reject_reason) ? '<p><strong>Powód odrzucenia:</strong><br>' . nl2br(esc_html($reject_reason)) . '</p>' : '')
               . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
-              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna.</p>'
+              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna. Prosimy nie odpowiadać na tę wiadomość.</p>'
               . '</div></div>';
         bm_send_html_mail(
             $user->user_email,

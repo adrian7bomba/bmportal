@@ -780,3 +780,10 @@ a.bm-portfolio-toggle {
 }
 
 .bm-help--file-error{ color:#b42318; font-weight:600; margin-top:6px; }
+
+.bm-form--supplier .bm-form__section{ margin-bottom:28px; }
+.bm-form--supplier .bm-grid{ gap:18px; margin-bottom:18px; }
+.bm-form--supplier .bm-field{ margin-bottom:14px; }
+.bm-form--supplier .bm-field label{ display:block; margin-bottom:6px; }
+.bm-form--supplier .bm-field .bm-help{ margin-top:8px; }
+.bm-form--supplier .bm-form__actions{ margin-top:26px; }

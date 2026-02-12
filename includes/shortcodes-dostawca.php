@@ -125,6 +125,7 @@ $bm_registration_shortcodes = [
     'bm_kod_pocztowy_firmy'    => 'kod_pocztowy_dostawca',
     'bm_miejscowosc_firmy'     => 'miejscowosc_dostawca',
     'bm_www_firmy'             => 'www_dostawca',
+    'bm_slogan_firmy'          => 'slogan_dostawca',
     'bm_opis_firmy'            => 'opis_dostawca',
     'bm_wielkosc_firmy'        => 'wielkosc_firmy_dostawca',
     'bm_opiekun_nazwa'         => 'opiekun_imie_nazwisko',
@@ -166,6 +167,31 @@ add_shortcode( 'bm_branze', function( $atts ) {
     $terms = wp_get_post_terms( $supplier_id, 'dostawca_branza', ['fields' => 'names'] );
     if ( is_wp_error($terms) || empty($terms) ) return '';
     return esc_html( implode( $atts['sep'], $terms ) );
+} );
+
+add_shortcode( 'bm_lokalizacje', function( $atts ) {
+    $atts = shortcode_atts(['sep' => ', '], $atts );
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_lokalizacja', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( implode( $atts['sep'], $terms ) );
+} );
+
+add_shortcode( 'bm_termin_realizacji', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_termin', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( $terms[0] );
+} );
+
+add_shortcode( 'bm_budzet', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_budzet', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( $terms[0] );
 } );
 
 

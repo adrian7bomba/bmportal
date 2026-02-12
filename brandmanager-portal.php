@@ -30,6 +30,7 @@ add_action( 'plugins_loaded', function() {
     require_once BM_PORTAL_PATH . 'includes/portal-ogloszenia.php';
     require_once BM_PORTAL_PATH . 'includes/messages.php';
     require_once BM_PORTAL_PATH . 'includes/messages-buttons.php';
+    require_once BM_PORTAL_PATH . 'includes/admin-brandmanager-menu.php';
     require_once BM_PORTAL_PATH . 'includes/deals.php';
     require_once BM_PORTAL_PATH . 'includes/reviews.php';
     require_once BM_PORTAL_PATH . 'includes/portfolio.php';

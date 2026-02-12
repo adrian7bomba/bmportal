@@ -807,3 +807,32 @@ a.button:hover{
 .bm-form--supplier-cito{
   margin-bottom:12px;
 }
+
+/* Klient (ACF form) – wizualnie jak formularz Dostawcy */
+.bm-form--client .acf-fields{ border:0 !important; }
+.bm-form--client .acf-field{ padding:10px 0 !important; border-top:0 !important; }
+.bm-form--client .acf-label label{ font-weight:600; margin-bottom:6px !important; }
+
+.bm-form--client .acf-input input[type="text"],
+.bm-form--client .acf-input input[type="email"],
+.bm-form--client .acf-input input[type="url"],
+.bm-form--client .acf-input input[type="tel"],
+.bm-form--client .acf-input input[type="number"],
+.bm-form--client .acf-input select,
+.bm-form--client .acf-input textarea{
+  border:1px solid var(--bm-brand-gray) !important;
+  border-radius:10px !important;
+  padding:10px 12px !important;
+  color:var(--bm-brand-black) !important;
+}
+
+.bm-form--client .acf-input input:focus,
+.bm-form--client .acf-input select:focus,
+.bm-form--client .acf-input textarea:focus{
+  border-color:var(--bm-brand-blue) !important;
+  box-shadow:0 0 0 3px rgba(71,192,199,.2) !important;
+}
+
+.bm-form--client .acf-form-submit{
+  margin-top:14px;
+}

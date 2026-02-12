@@ -771,3 +771,12 @@ a.bm-portfolio-toggle {
 .bm-photo-preview.is-filled span{ display:none; }
 
 .bm-reject-reason{ border-left:4px solid var(--bm-brand-red); }
+
+
+.bm-btn-nip-fetch:hover,
+.bm-btn-submit:hover{
+  background:var(--bm-brand-navy) !important;
+  border-color:var(--bm-brand-navy) !important;
+}
+
+.bm-help--file-error{ color:#b42318; font-weight:600; margin-top:6px; }

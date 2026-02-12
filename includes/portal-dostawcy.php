@@ -63,14 +63,14 @@ function bm_get_supplier_field($post_id, $field_name, $default = ''){
 /**
  * Upload obrazka do Media Library i zwróć attachment_id
  */
-function bm_handle_image_upload($file_key, $max_bytes = 131072){
+function bm_handle_image_upload($file_key, $max_bytes = 262144){
     if (empty($_FILES[$file_key]) || empty($_FILES[$file_key]['name'])) return 0;
     if (!function_exists('wp_handle_upload')) require_once ABSPATH.'wp-admin/includes/file.php';
     if (!function_exists('wp_generate_attachment_metadata')) require_once ABSPATH.'wp-admin/includes/image.php';
 
     $f = $_FILES[$file_key];
     if (!empty($f['size']) && (int)$f['size'] > (int)$max_bytes){
-        return new WP_Error('bm_file_too_big', 'Plik jest za duży. Maksymalny rozmiar: 128KB.');
+        return new WP_Error('bm_file_too_big', 'Plik jest za duży. Maksymalny rozmiar: 256KB.');
     }
 
     $allowed = ['image/jpeg','image/png','image/webp'];
@@ -101,6 +101,20 @@ function bm_handle_image_upload($file_key, $max_bytes = 131072){
     wp_update_attachment_metadata($attachment_id, $attach_data);
 
     return (int)$attachment_id;
+}
+
+/**
+ * Czy użytkownik ma aktywne Premium (hook pod dalszą integrację Woo)
+ */
+function bm_user_has_premium($user_id){
+    $has_premium = false;
+    $user = get_userdata((int) $user_id);
+
+    if ($user && in_array('premium', (array) $user->roles, true)){
+        $has_premium = true;
+    }
+
+    return (bool) apply_filters('bm_user_has_premium', $has_premium, (int) $user_id);
 }
 
 /**
@@ -204,18 +218,20 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
             $awarded      = bm_post('bm_awarded') ? 1 : 0;
             $awarded_text = sanitize_textarea_field(bm_post('bm_awarded_text'));
 
+            $max_taxonomy_items = bm_user_has_premium($user->ID) ? 6 : 3;
+
             $spec_ids = array_map('intval', (array)bm_post('bm_specializations', []));
             $spec_ids = array_values(array_filter($spec_ids));
-            if (count($spec_ids) > 3){
-                $errors[] = 'Możesz wybrać maksymalnie 3 specjalizacje.';
-                $spec_ids = array_slice($spec_ids, 0, 3);
+            if (count($spec_ids) > $max_taxonomy_items){
+                $errors[] = sprintf('Możesz wybrać maksymalnie %d specjalizacje.', $max_taxonomy_items);
+                $spec_ids = array_slice($spec_ids, 0, $max_taxonomy_items);
             }
 
             $ind_ids = array_map('intval', (array)bm_post('bm_industries', []));
             $ind_ids = array_values(array_filter($ind_ids));
-            if (count($ind_ids) > 3){
-                $errors[] = 'Możesz wybrać maksymalnie 3 branże doświadczenia.';
-                $ind_ids = array_slice($ind_ids, 0, 3);
+            if (count($ind_ids) > $max_taxonomy_items){
+                $errors[] = sprintf('Możesz wybrać maksymalnie %d branż doświadczenia.', $max_taxonomy_items);
+                $ind_ids = array_slice($ind_ids, 0, $max_taxonomy_items);
             }
 
             // Uploady (logo + zdjęcie firmy)
@@ -271,6 +287,13 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                     'post_name'  => sanitize_title($company_name),
                 ]);
 
+                // czytelna nazwa użytkownika (zamiast samego prefiksu z e-maila)
+                wp_update_user([
+                    'ID'           => $user->ID,
+                    'display_name' => $company_name,
+                    'nickname'     => $company_name,
+                ]);
+
                 // status pending (tylko z frontu)
                 if (!current_user_can('manage_options')){
                     wp_update_post(['ID'=>$post_id,'post_status'=>'pending']);
@@ -280,12 +303,21 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 $emails = bm_get_superadmin_emails();
                 $user_panel_link = admin_url('user-edit.php?user_id='.$user->ID);
                 $supplier_post_link = get_edit_post_link($post_id);
+                $specializations_names = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);
+                $industries_names = wp_get_post_terms($post_id, 'dostawca_branza', ['fields' => 'names']);
+
                 $html = '<div style="font-family:Arial,sans-serif;line-height:1.5">'
                       . '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px;max-width:700px">'
                       . '<h2 style="margin:0 0 10px">Wykonawca – dane do akceptacji</h2>'
                       . '<p>Wykonawca <strong>'.esc_html($user->user_email).'</strong> zaktualizował dane firmy.</p>'
                       . '<p><strong>Nazwa firmy:</strong> '.esc_html($company_name).'<br>'
-                      . '<strong>NIP:</strong> '.esc_html($nip_raw).'</p>'
+                      . '<strong>NIP:</strong> '.esc_html($nip_raw).'<br>'
+                      . '<strong>Adres:</strong> '.esc_html($street.', '.$postcode.' '.$city).'<br>'
+                      . '<strong>Status VAT:</strong> '.esc_html(sanitize_text_field(bm_post('bm_company_vat_status'))).'</p>'
+                      . '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop($desc)).'</p>'
+                      . '<p><strong>Branże:</strong> '.esc_html(!empty($industries_names) ? implode(', ', $industries_names) : '—').'<br>'
+                      . '<strong>Specjalizacje:</strong> '.esc_html(!empty($specializations_names) ? implode(', ', $specializations_names) : '—').'<br>'
+                      . '<strong>Opiekun klienta:</strong> '.esc_html(trim($op_name.' / '.$op_role.' / '.$op_email.' / '.$op_phone, ' /')).'</p>'
                       . '<p><strong>Profil użytkownika:</strong> '.esc_html($user_panel_link).'</p>'
                       . ($supplier_post_link ? '<p><strong>Link do edycji wizytówki:</strong> '.esc_html($supplier_post_link).'</p>' : '')
                       . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
@@ -333,6 +365,9 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '</div>';
 
     // wartości do formularza
+    $is_premium = bm_user_has_premium($user->ID);
+    $max_taxonomy_items = $is_premium ? 6 : 3;
+
     $v_company_name = bm_get_supplier_field($post_id,'nazwa_dostawca','');
     $v_street       = bm_get_supplier_field($post_id,'ulica_dostawca','');
     $v_postcode     = bm_get_supplier_field($post_id,'kod_pocztowy_dostawca','');
@@ -368,12 +403,16 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-field bm-field--street"><label>Ulica i numer <span class="bm-req">*</span></label><input type="text" name="bm_company_street" value="'.esc_attr($v_street).'" required></div>';
     echo '<div class="bm-field bm-field--postcode"><label>Kod pocztowy <span class="bm-req">*</span></label><input type="text" name="bm_company_postcode" value="'.esc_attr($v_postcode).'" required></div>';
     echo '<div class="bm-field bm-field--city"><label>Miejscowość <span class="bm-req">*</span></label><input type="text" name="bm_company_city" value="'.esc_attr($v_city).'" required></div>';
+    echo '<div class="bm-field bm-field--vat"><label>Status VAT</label><input type="text" name="bm_company_vat_status" value="'.esc_attr($v_vat_status).'" readonly></div>';
+    echo '<div class="bm-field bm-field--regon"><label>REGON</label><input type="text" name="bm_company_regon" value="'.esc_attr($v_regon).'" readonly></div>';
+    echo '<div class="bm-field bm-field--krs"><label>KRS</label><input type="text" name="bm_company_krs" value="'.esc_attr($v_krs).'" readonly></div>';
+    echo '<div class="bm-field bm-field--legal"><label>Forma prawna</label><input type="text" name="bm_company_legal_form" value="'.esc_attr($v_legal_form).'" readonly></div>';
 
     echo '</div>'; // grid
 
     echo '<div class="bm-grid bm-grid--2">';
-    echo '<div class="bm-field bm-field--logo"><label>Logo firmy</label><input type="file" name="bm_company_logo" accept="image/*"><div class="bm-help">Maksymalny rozmiar pliku: 128KB. Format: JPG/PNG/WEBP.</div></div>';
-    echo '<div class="bm-field bm-field--photo"><label>Zdjęcie firmy</label><input type="file" name="bm_company_photo" accept="image/*"><div class="bm-help">Najlepiej wykadruj zdjęcie tak, aby główna treść była na środku. Maksymalny rozmiar: 128KB.</div></div>';
+    echo '<div class="bm-field bm-field--logo"><label>Logo firmy</label><input type="file" name="bm_company_logo" accept="image/*" data-max-kb="256"><div class="bm-help">Maksymalny rozmiar pliku: 256KB. Format: JPG/PNG/WEBP.</div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
+    echo '<div class="bm-field bm-field--photo"><label>Zdjęcie firmy</label><input type="file" name="bm_company_photo" accept="image/*" data-max-kb="256"><div class="bm-help">Najlepiej wykadruj zdjęcie tak, aby główna treść była na środku. Maksymalny rozmiar: 256KB. Twój obrazek będzie wykadrowany do koła.</div><div class="bm-photo-preview"><span>Podgląd zdjęcia w kole</span></div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
     echo '</div>';
 
     echo '</div>'; // section
@@ -417,11 +456,12 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '</div>';
 
     echo '<div class="bm-grid bm-grid--2">';
-    echo '<div class="bm-field bm-field--spec"><label>Specjalizacja (max 3)</label>';
-    bm_render_tax_tree('dostawca_kategoria','bm_specializations',$v_spec,3);
+    echo '<div class="bm-field bm-field--spec"><label>Specjalizacja (max '.(int)$max_taxonomy_items.')</label>';
+    bm_render_tax_tree('dostawca_kategoria','bm_specializations',$v_spec,$max_taxonomy_items);
+    echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> specjalizacji.</div>';
     echo '</div>';
-    echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max 3)</label>';
-    bm_render_tax_tree('dostawca_branza','bm_industries',$v_ind,3);
+    echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max '.(int)$max_taxonomy_items.')</label>';
+    bm_render_tax_tree('dostawca_branza','bm_industries',$v_ind,$max_taxonomy_items);
     echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> branż.</div>';
     echo '</div>';
     echo '</div>';
@@ -457,15 +497,35 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
       function initTree(root){
         var max = parseInt(root.getAttribute("data-max"),10)||3;
         var cbs = root.querySelectorAll("input[type=checkbox]");
+
+        cbs.forEach(function(cb){
+          if(cb.disabled && !cb.name){
+            cb.dataset.permanentDisabled = "1";
+          }
+        });
+
         function enforce(){
           var checked = root.querySelectorAll("input[type=checkbox]:checked");
           if(checked.length>=max){
-            cbs.forEach(function(cb){ if(!cb.checked){ cb.disabled=true; cb.parentElement.classList.add("is-disabled"); } });
+            cbs.forEach(function(cb){
+              if(cb.dataset.permanentDisabled === "1") return;
+              if(!cb.checked){
+                cb.disabled=true;
+                cb.parentElement.classList.add("is-disabled");
+              }
+            });
           }else{
-            cbs.forEach(function(cb){ cb.disabled=false; cb.parentElement.classList.remove("is-disabled"); });
+            cbs.forEach(function(cb){
+              if(cb.dataset.permanentDisabled === "1") return;
+              cb.disabled=false;
+              cb.parentElement.classList.remove("is-disabled");
+            });
           }
         }
-        cbs.forEach(function(cb){ cb.addEventListener("change", enforce); });
+        cbs.forEach(function(cb){
+          if(cb.dataset.permanentDisabled === "1") return;
+          cb.addEventListener("change", enforce);
+        });
         enforce();
       }
       document.querySelectorAll(".bm-tax-tree").forEach(initTree);
@@ -494,12 +554,37 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
           photoInput.addEventListener("change", function(){
             var file = this.files && this.files[0] ? this.files[0] : null;
             if(!file) return;
+            if(file.size > 262144){
+              var err = this.parentElement.querySelector(".bm-help--file-error");
+              if(err){ err.textContent = "Plik jest za duży. Maksymalny rozmiar: 256KB."; }
+              this.value = "";
+              photoPreview.classList.remove("is-filled");
+              photoPreview.style.backgroundImage = "none";
+              return;
+            }
+            var err = this.parentElement.querySelector(".bm-help--file-error");
+            if(err){ err.textContent = ""; }
             var reader = new FileReader();
             reader.onload = function(e){
               photoPreview.style.backgroundImage = "url(" + e.target.result + ")";
               photoPreview.classList.add("is-filled");
             };
             reader.readAsDataURL(file);
+          });
+        }
+
+        var logoInput = form.querySelector("input[name=bm_company_logo]");
+        if(logoInput){
+          logoInput.addEventListener("change", function(){
+            var file = this.files && this.files[0] ? this.files[0] : null;
+            if(!file) return;
+            var err = this.parentElement.querySelector(".bm-help--file-error");
+            if(file.size > 262144){
+              if(err){ err.textContent = "Plik jest za duży. Maksymalny rozmiar: 256KB."; }
+              this.value = "";
+              return;
+            }
+            if(err){ err.textContent = ""; }
           });
         }
 
@@ -559,7 +644,8 @@ add_action('edit_user_profile', function($user){
     $post_id = bm_get_or_create_supplier_post($user->ID);
     $status  = get_post_status($post_id) ?: 'draft';
 
-    echo '<h2>Dane Wykonawcy – akceptacja</h2>';
+    echo '<h2 style="margin:0;padding:12px 14px;background:#282a36;color:#fff;border-radius:8px;">Dane Wykonawcy – akceptacja</h2>';
+    echo '<p style="margin:10px 0 14px;padding:10px 12px;border:1px solid #47c0c7;border-radius:8px;background:#f4fdfe;">Sekcja weryfikacji znajduje się na górze profilu. Poniżej widzisz status i komplet danych do decyzji.</p>';
 
     echo '<table class="form-table"><tbody>';
 
@@ -586,6 +672,19 @@ add_action('edit_user_profile', function($user){
 
     echo '</td>';
     echo '</tr>';
+
+    echo '<tr><th>Dane do akceptacji</th><td>';
+    echo '<div style="border:1px solid #EE2356;border-radius:10px;padding:12px;background:#fff7f9">';
+    echo '<p><strong>Firma:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'nazwa_dostawca','—')).'</p>';
+    echo '<p><strong>Adres:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'ulica_dostawca','')).', '.esc_html((string) bm_get_supplier_field($post_id,'kod_pocztowy_dostawca','')).' '.esc_html((string) bm_get_supplier_field($post_id,'miejscowosc_dostawca','')).'</p>';
+    echo '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop((string) bm_get_supplier_field($post_id,'opis_dostawca',''))).'</p>';
+    $admin_spec = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);
+    $admin_ind = wp_get_post_terms($post_id, 'dostawca_branza', ['fields' => 'names']);
+    echo '<p><strong>Branże:</strong> '.esc_html(!empty($admin_ind) ? implode(', ', $admin_ind) : '—').'</p>';
+    echo '<p><strong>Specjalizacje:</strong> '.esc_html(!empty($admin_spec) ? implode(', ', $admin_spec) : '—').'</p>';
+    echo '<p><strong>Opiekun:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_imie_nazwisko','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_stanowisko','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_email','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_telefon','—')).'</p>';
+    echo '</div>';
+    echo '</td></tr>';
 
     // Podgląd: logo + zdjęcie firmy (jeśli istnieją)
     $logo_id  = 0;

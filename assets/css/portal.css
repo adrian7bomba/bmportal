@@ -850,3 +850,23 @@ a.button:hover{
 .bm-form--client .acf-form-submit{
   margin-top:14px;
 }
+
+/* Utwardzenie stylu przycisku "Pobierz dane" (nadpisywanie styli motywu/Woo) */
+.bm-nip-inline .button.bm-btn-nip-fetch,
+.woocommerce .bm-nip-inline .button.bm-btn-nip-fetch,
+.woocommerce-page .bm-nip-inline .button.bm-btn-nip-fetch{
+  background: #EE2356 !important;
+  border-color: #EE2356 !important;
+  color: #fff !important;
+}
+
+.bm-nip-inline .button.bm-btn-nip-fetch:hover,
+.bm-nip-inline .button.bm-btn-nip-fetch:focus,
+.woocommerce .bm-nip-inline .button.bm-btn-nip-fetch:hover,
+.woocommerce .bm-nip-inline .button.bm-btn-nip-fetch:focus,
+.woocommerce-page .bm-nip-inline .button.bm-btn-nip-fetch:hover,
+.woocommerce-page .bm-nip-inline .button.bm-btn-nip-fetch:focus{
+  background: #1d1b1c !important;
+  border-color: #1d1b1c !important;
+  color: #fff !important;
+}

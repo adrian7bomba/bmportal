@@ -199,6 +199,45 @@ add_shortcode( 'bm_budzet', function() {
     return esc_html( $terms[0] );
 } );
 
+add_shortcode( 'bm_konto_typ', function() {
+    if ( ! is_user_logged_in() || ! function_exists('bm_get_account_plan_data') ) return '';
+    $plan = bm_get_account_plan_data( get_current_user_id() );
+    return esc_html( $plan['label'] );
+} );
+
+add_shortcode( 'bm_dane_wykonawcy_status', function() {
+    if ( ! function_exists('bm_get_or_create_supplier_post') ) return '';
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $status = get_post_status($supplier_id);
+    $map = [
+        'draft'    => 'Robocze',
+        'pending'  => 'Oczekujące',
+        'publish'  => 'Zaakceptowane',
+        'rejected' => 'Do poprawy',
+    ];
+    return esc_html( $map[$status] ?? $status );
+} );
+
+add_shortcode( 'bm_dane_wykonawcy_adres', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $street = get_post_meta($supplier_id, 'ulica_dostawca', true);
+    $code   = get_post_meta($supplier_id, 'kod_pocztowy_dostawca', true);
+    $city   = get_post_meta($supplier_id, 'miejscowosc_dostawca', true);
+    $addr = trim($street.' '.$code.' '.$city);
+    return esc_html($addr);
+} );
+
+add_shortcode( 'bm_sekcja_dane_wykonawcy', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $status = do_shortcode('[bm_dane_wykonawcy_status]');
+    $addr = do_shortcode('[bm_dane_wykonawcy_adres]');
+    $plan = do_shortcode('[bm_konto_typ]');
+    return '<div class="bm-box bm-box--account"><h3 class="bm-account-title">Dane Wykonawcy</h3><p><strong>Plan:</strong> '.esc_html($plan).'</p><p><strong>Status:</strong> '.esc_html($status).'</p><p><strong>Adres:</strong> '.esc_html($addr).'</p></div>';
+} );
+
 
 add_shortcode( 'bm_logo_firmy', function() {
     return do_shortcode('[dostawca_obrazek klucz="logo_dostawca" size="medium"]');

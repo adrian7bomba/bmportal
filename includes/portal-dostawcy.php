@@ -114,8 +114,62 @@ function bm_user_has_premium($user_id){
         $has_premium = true;
     }
 
+    // Premium po zakupie produktu WooCommerce (ID: 1268)
+    if ( ! $has_premium && function_exists('wc_get_orders') ) {
+        $orders = wc_get_orders([
+            'customer_id' => (int) $user_id,
+            'status'      => ['wc-processing', 'wc-completed'],
+            'limit'       => -1,
+            'return'      => 'objects',
+        ]);
+
+        foreach ((array) $orders as $order){
+            foreach ($order->get_items() as $item){
+                if ((int) $item->get_product_id() === 1268){
+                    $has_premium = true;
+                    break 2;
+                }
+            }
+        }
+    }
+
     return (bool) apply_filters('bm_user_has_premium', $has_premium, (int) $user_id);
 }
+
+function bm_get_account_plan_data($user_id){
+    $is_premium = bm_user_has_premium((int) $user_id);
+
+    if ($is_premium){
+        return [
+            'is_premium' => true,
+            'label'      => 'Premium',
+            'message'    => 'Korzystasz z konta Premium. Poznaj swoje przewagi,',
+            'link_text'  => 'zobacz',
+            'link_url'   => 'https://brandmanager.cfolks.pl/premium/',
+        ];
+    }
+
+    return [
+        'is_premium' => false,
+        'label'      => 'Standard',
+        'message'    => 'Korzystasz z konta Standard. Dowiedz się co oferuje Premium i',
+        'link_text'  => 'ulepsz',
+        'link_url'   => 'https://brandmanager.cfolks.pl/premium/',
+    ];
+}
+
+add_action('woocommerce_account_content', function(){
+    if (!is_user_logged_in()) return;
+    $user = wp_get_current_user();
+    if (!$user || !in_array('dostawca', (array) $user->roles, true)) return;
+
+    $plan = bm_get_account_plan_data($user->ID);
+    echo '<div class="bm-account-plan-note">'
+       . esc_html($plan['message'])
+       . ' <a href="'.esc_url($plan['link_url']).'" class="bm-premium-link" target="_blank" rel="noopener">'
+       . esc_html($plan['link_text'])
+       . '</a> -></div>';
+}, 1);
 
 /**
  * Render drzewka taksonomii z checkboxami (hierarchicznie)
@@ -414,6 +468,19 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     // wartości do formularza
     $is_premium = bm_user_has_premium($user->ID);
     $max_taxonomy_items = $is_premium ? 6 : 3;
+    $upgrade_link = '<a href="https://brandmanager.cfolks.pl/premium/" class="bm-premium-link" target="_blank" rel="noopener">Ulepsz</a> ->';
+
+    $premium_desc_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać 1500 znaków opisu. W koncie Standard to tylko 200 znaków.'
+        : 'W wersji darmowej limit opisu to 200 znaków. W pakiecie Premium: 1500 znaków. '.$upgrade_link;
+
+    $premium_spec_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać aż o 3 specjalizacje więcej niż konto standardowe.'
+        : 'W Premium możesz wybrać do 6 specjalizacji. '.$upgrade_link;
+
+    $premium_ind_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać aż o 3 branże więcej niż konto standardowe.'
+        : 'W Premium możesz wybrać do 6 branż. '.$upgrade_link;
 
     $v_company_name = bm_get_supplier_field($post_id,'nazwa_dostawca','');
     $v_street       = bm_get_supplier_field($post_id,'ulica_dostawca','');
@@ -494,7 +561,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
 
     echo '<div class="bm-field bm-field--desc">';
     echo '<label>Opis firmy</label>';
-    echo '<div class="bm-premium-note bm-premium-note--green">W wersji darmowej limit opisu to <strong>200 znaków</strong>. W pakiecie Premium: <strong>1500 znaków</strong>.</div>';
+    echo '<div class="bm-premium-note bm-premium-note--green">'.wp_kses_post($premium_desc_note).'</div>';
     wp_editor($v_desc, 'bm_company_description', [
         'textarea_name' => 'bm_company_description',
         'media_buttons' => false,
@@ -521,11 +588,11 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-grid bm-grid--2">';
     echo '<div class="bm-field bm-field--spec"><label>Specjalizacja (max '.(int)$max_taxonomy_items.')</label>';
     bm_render_tax_tree('dostawca_kategoria','bm_specializations',$v_spec,$max_taxonomy_items);
-    echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> specjalizacji.</div>';
+    echo '<div class="bm-premium-note">'.wp_kses_post($premium_spec_note).'</div>';
     echo '</div>';
     echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max '.(int)$max_taxonomy_items.')</label>';
     bm_render_tax_tree('dostawca_branza','bm_industries',$v_ind,$max_taxonomy_items);
-    echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> branż.</div>';
+    echo '<div class="bm-premium-note">'.wp_kses_post($premium_ind_note).'</div>';
     echo '</div>';
     echo '</div>';
 

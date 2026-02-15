@@ -797,6 +797,20 @@ a.button:hover{
 
 .bm-help--file-error{ color:#b42318; font-weight:600; margin-top:6px; }
 
+.bm-premium-link{
+  text-decoration: underline !important;
+  font-weight:700;
+  color:#fff !important;
+}
+
+.bm-account-plan-note{
+  background:#282a36;
+  color:#fff;
+  border-radius:10px;
+  padding:10px 12px;
+  margin:0 0 12px;
+}
+
 .bm-form--supplier .bm-form__section{ margin-bottom:20px; }
 .bm-form--supplier .bm-grid{ gap:12px; margin-bottom:12px; }
 .bm-form--supplier .bm-field{ margin-bottom:8px; }

@@ -63,14 +63,14 @@ function bm_get_supplier_field($post_id, $field_name, $default = ''){
 /**
  * Upload obrazka do Media Library i zwróć attachment_id
  */
-function bm_handle_image_upload($file_key, $max_bytes = 131072){
+function bm_handle_image_upload($file_key, $max_bytes = 262144){
     if (empty($_FILES[$file_key]) || empty($_FILES[$file_key]['name'])) return 0;
     if (!function_exists('wp_handle_upload')) require_once ABSPATH.'wp-admin/includes/file.php';
     if (!function_exists('wp_generate_attachment_metadata')) require_once ABSPATH.'wp-admin/includes/image.php';
 
     $f = $_FILES[$file_key];
     if (!empty($f['size']) && (int)$f['size'] > (int)$max_bytes){
-        return new WP_Error('bm_file_too_big', 'Plik jest za duży. Maksymalny rozmiar: 128KB.');
+        return new WP_Error('bm_file_too_big', 'Plik jest za duży. Maksymalny rozmiar: 256KB.');
     }
 
     $allowed = ['image/jpeg','image/png','image/webp'];
@@ -104,6 +104,74 @@ function bm_handle_image_upload($file_key, $max_bytes = 131072){
 }
 
 /**
+ * Czy użytkownik ma aktywne Premium (hook pod dalszą integrację Woo)
+ */
+function bm_user_has_premium($user_id){
+    $has_premium = false;
+    $user = get_userdata((int) $user_id);
+
+    if ($user && in_array('premium', (array) $user->roles, true)){
+        $has_premium = true;
+    }
+
+    // Premium po zakupie produktu WooCommerce (ID: 1268)
+    if ( ! $has_premium && function_exists('wc_get_orders') ) {
+        $orders = wc_get_orders([
+            'customer_id' => (int) $user_id,
+            'status'      => ['wc-processing', 'wc-completed'],
+            'limit'       => -1,
+            'return'      => 'objects',
+        ]);
+
+        foreach ((array) $orders as $order){
+            foreach ($order->get_items() as $item){
+                if ((int) $item->get_product_id() === 1268){
+                    $has_premium = true;
+                    break 2;
+                }
+            }
+        }
+    }
+
+    return (bool) apply_filters('bm_user_has_premium', $has_premium, (int) $user_id);
+}
+
+function bm_get_account_plan_data($user_id){
+    $is_premium = bm_user_has_premium((int) $user_id);
+
+    if ($is_premium){
+        return [
+            'is_premium' => true,
+            'label'      => 'Premium',
+            'message'    => 'Korzystasz z konta Premium. Poznaj swoje przewagi,',
+            'link_text'  => 'zobacz',
+            'link_url'   => 'https://brandmanager.cfolks.pl/premium/',
+        ];
+    }
+
+    return [
+        'is_premium' => false,
+        'label'      => 'Standard',
+        'message'    => 'Korzystasz z konta Standard. Dowiedz się co oferuje Premium i',
+        'link_text'  => 'ulepsz',
+        'link_url'   => 'https://brandmanager.cfolks.pl/premium/',
+    ];
+}
+
+add_action('woocommerce_account_content', function(){
+    if (!is_user_logged_in()) return;
+    $user = wp_get_current_user();
+    if (!$user || !in_array('dostawca', (array) $user->roles, true)) return;
+
+    $plan = bm_get_account_plan_data($user->ID);
+    echo '<div class="bm-account-plan-note">'
+       . esc_html($plan['message'])
+       . ' <a href="'.esc_url($plan['link_url']).'" class="bm-premium-link" target="_blank" rel="noopener">'
+       . esc_html($plan['link_text'])
+       . '</a> -></div>';
+}, 1);
+
+/**
  * Render drzewka taksonomii z checkboxami (hierarchicznie)
  */
 function bm_render_tax_tree($taxonomy, $name, $selected_ids = [], $max = 3){
@@ -133,10 +201,16 @@ function bm_render_tax_tree($taxonomy, $name, $selected_ids = [], $max = 3){
             'order'      => 'ASC',
         ]);
         $is_checked = in_array((int)$term->term_id, $selected_ids, true);
+        $is_parent_only = !is_wp_error($children) && !empty($children);
         echo '<li class="bm-tax-tree__item">';
         echo '<label class="bm-tax-tree__label">';
-        echo '<input class="bm-tax-tree__checkbox" type="checkbox" name="'.esc_attr($name).'[]" value="'.esc_attr($term->term_id).'" '.checked($is_checked,true,false).'> ';
-        echo '<span>'.esc_html($term->name).'</span>';
+        if ($is_parent_only){
+            echo '<input class="bm-tax-tree__checkbox" type="checkbox" disabled aria-disabled="true"> ';
+            echo '<span class="bm-tax-tree__parent">'.esc_html($term->name).'</span>';
+        } else {
+            echo '<input class="bm-tax-tree__checkbox" type="checkbox" name="'.esc_attr($name).'[]" value="'.esc_attr($term->term_id).'" '.checked($is_checked,true,false).'> ';
+            echo '<span>'.esc_html($term->name).'</span>';
+        }
         echo '</label>';
         if (!is_wp_error($children) && !empty($children)){
             echo '<ul class="bm-tax-tree__children">';
@@ -167,6 +241,19 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $errors = [];
     $success = '';
 
+    // SZYBKA AKTUALIZACJA: tylko flaga CITO (bez wysyłki do akceptacji)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bm_supplier_cito_only'])){
+        if (!isset($_POST['_bm_cito_nonce']) || !wp_verify_nonce($_POST['_bm_cito_nonce'], 'bm_supplier_cito_only')){
+            $errors[] = 'Błąd zabezpieczeń formularza CITO. Odśwież stronę i spróbuj ponownie.';
+        } else {
+            $cito_now = bm_post('bm_cito_now') ? 1 : 0;
+            bm_set_supplier_field($post_id, 'bm_cito_now', $cito_now);
+            $success = $cito_now
+                ? 'Status „Realizujemy na CITO” został włączony.'
+                : 'Status „Realizujemy na CITO” został wyłączony.';
+        }
+    }
+
     // ZAPIS FORMULARZA (KROK 2)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bm_supplier_step2']) ){
         if (!isset($_POST['_bm_nonce']) || !wp_verify_nonce($_POST['_bm_nonce'], 'bm_supplier_step2')){
@@ -184,9 +271,11 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
             if ($postcode === '') $errors[] = 'Podaj kod pocztowy.';
             if ($city === '') $errors[] = 'Podaj miejscowość.';
             if ($nip_raw === '' || strlen($nip_raw) !== 10) $errors[] = 'Podaj poprawny NIP (10 cyfr).';
+            if (!bm_post('bm_confirm_company_data')) $errors[] = 'Potwierdź poprawność danych firmy przed wysłaniem.';
 
             // Profil
             $www          = esc_url_raw(bm_post('bm_company_www'));
+            $slogan       = sanitize_text_field(bm_post('bm_company_slogan'));
             $desc         = wp_kses_post(bm_post('bm_company_description'));
             $size         = sanitize_text_field(bm_post('bm_company_size'));
             $op_name      = sanitize_text_field(bm_post('bm_contact_name'));
@@ -194,22 +283,39 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
             $op_email     = sanitize_email(bm_post('bm_contact_email'));
             $op_phone     = sanitize_text_field(bm_post('bm_contact_phone'));
 
+            if (mb_strlen($slogan) > 45){
+                $errors[] = 'Slogan firmy może mieć maksymalnie 45 znaków.';
+                $slogan = mb_substr($slogan, 0, 45);
+            }
+
             $awarded      = bm_post('bm_awarded') ? 1 : 0;
             $awarded_text = sanitize_textarea_field(bm_post('bm_awarded_text'));
 
+            $max_taxonomy_items = bm_user_has_premium($user->ID) ? 6 : 3;
+
             $spec_ids = array_map('intval', (array)bm_post('bm_specializations', []));
             $spec_ids = array_values(array_filter($spec_ids));
-            if (count($spec_ids) > 3){
-                $errors[] = 'Możesz wybrać maksymalnie 3 specjalizacje.';
-                $spec_ids = array_slice($spec_ids, 0, 3);
+            if (count($spec_ids) > $max_taxonomy_items){
+                $errors[] = sprintf('Możesz wybrać maksymalnie %d specjalizacje.', $max_taxonomy_items);
+                $spec_ids = array_slice($spec_ids, 0, $max_taxonomy_items);
             }
 
             $ind_ids = array_map('intval', (array)bm_post('bm_industries', []));
             $ind_ids = array_values(array_filter($ind_ids));
-            if (count($ind_ids) > 3){
-                $errors[] = 'Możesz wybrać maksymalnie 3 branże doświadczenia.';
-                $ind_ids = array_slice($ind_ids, 0, 3);
+            if (count($ind_ids) > $max_taxonomy_items){
+                $errors[] = sprintf('Możesz wybrać maksymalnie %d branż doświadczenia.', $max_taxonomy_items);
+                $ind_ids = array_slice($ind_ids, 0, $max_taxonomy_items);
             }
+
+            $location_ids = array_map('intval', (array) bm_post('bm_locations', []));
+            $location_ids = array_values(array_filter($location_ids));
+            if (count($location_ids) > 3){
+                $errors[] = 'Możesz wybrać maksymalnie 3 lokalizacje.';
+                $location_ids = array_slice($location_ids, 0, 3);
+            }
+
+            $term_id = (int) bm_post('bm_term', 0);
+            $budget_id = (int) bm_post('bm_budget', 0);
 
             // Uploady (logo + zdjęcie firmy)
             $logo_upload = bm_handle_image_upload('bm_company_logo');
@@ -225,8 +331,13 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 bm_set_supplier_field($post_id, 'kod_pocztowy_dostawca', $postcode);
                 bm_set_supplier_field($post_id, 'miejscowosc_dostawca', $city);
                 bm_set_supplier_field($post_id, 'nip_dostawca', $nip_raw);
+                bm_set_supplier_field($post_id, 'regon_dostawca', sanitize_text_field(bm_post('bm_company_regon')));
+                bm_set_supplier_field($post_id, 'krs_dostawca', sanitize_text_field(bm_post('bm_company_krs')));
+                bm_set_supplier_field($post_id, 'vat_status_dostawca', sanitize_text_field(bm_post('bm_company_vat_status')));
+                bm_set_supplier_field($post_id, 'forma_prawna_dostawca', sanitize_text_field(bm_post('bm_company_legal_form')));
 
                 bm_set_supplier_field($post_id, 'www_dostawca', $www);
+                bm_set_supplier_field($post_id, 'slogan_dostawca', $slogan);
                 bm_set_supplier_field($post_id, 'opis_dostawca', $desc);
                 bm_set_supplier_field($post_id, 'wielkosc_firmy_dostawca', $size);
 
@@ -242,8 +353,19 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 bm_set_supplier_field($post_id, 'bm_specializations', $spec_ids);
                 wp_set_object_terms($post_id, $spec_ids, 'dostawca_kategoria', false);
 
-                // branże – meta (oddzielnie)
+                // branże – meta + termy
                 bm_set_supplier_field($post_id, 'bm_industries', $ind_ids);
+                wp_set_object_terms($post_id, $ind_ids, 'dostawca_branza', false);
+
+                // lokalizacje/termin/budżet
+                bm_set_supplier_field($post_id, 'bm_locations', $location_ids);
+                wp_set_object_terms($post_id, $location_ids, 'dostawca_lokalizacja', false);
+
+                bm_set_supplier_field($post_id, 'bm_term', $term_id);
+                wp_set_object_terms($post_id, $term_id ? [$term_id] : [], 'dostawca_termin', false);
+
+                bm_set_supplier_field($post_id, 'bm_budget', $budget_id);
+                wp_set_object_terms($post_id, $budget_id ? [$budget_id] : [], 'dostawca_budzet', false);
 
                 if (is_int($logo_upload) && $logo_upload > 0){
                     bm_set_supplier_field($post_id, 'logo_dostawca', $logo_upload);
@@ -259,6 +381,13 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                     'post_name'  => sanitize_title($company_name),
                 ]);
 
+                // czytelna nazwa użytkownika (zamiast samego prefiksu z e-maila)
+                wp_update_user([
+                    'ID'           => $user->ID,
+                    'display_name' => $company_name,
+                    'nickname'     => $company_name,
+                ]);
+
                 // status pending (tylko z frontu)
                 if (!current_user_can('manage_options')){
                     wp_update_post(['ID'=>$post_id,'post_status'=>'pending']);
@@ -268,16 +397,30 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
                 $emails = bm_get_superadmin_emails();
                 $user_panel_link = admin_url('user-edit.php?user_id='.$user->ID);
                 $supplier_post_link = get_edit_post_link($post_id);
+                $specializations_names = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);
+                $industries_names = wp_get_post_terms($post_id, 'dostawca_branza', ['fields' => 'names']);
+                $locations_names = wp_get_post_terms($post_id, 'dostawca_lokalizacja', ['fields' => 'names']);
+                $terms_names = wp_get_post_terms($post_id, 'dostawca_termin', ['fields' => 'names']);
+                $budgets_names = wp_get_post_terms($post_id, 'dostawca_budzet', ['fields' => 'names']);
+
                 $html = '<div style="font-family:Arial,sans-serif;line-height:1.5">'
                       . '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px;max-width:700px">'
                       . '<h2 style="margin:0 0 10px">Wykonawca – dane do akceptacji</h2>'
                       . '<p>Wykonawca <strong>'.esc_html($user->user_email).'</strong> zaktualizował dane firmy.</p>'
                       . '<p><strong>Nazwa firmy:</strong> '.esc_html($company_name).'<br>'
-                      . '<strong>NIP:</strong> '.esc_html($nip_raw).'</p>'
-                      . '<p style="margin:12px 0">'
-                      . '<a href="'.esc_url($user_panel_link).'" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#1B2A4E;color:#fff;text-decoration:none">Profil użytkownika</a> '
-                      . ($supplier_post_link ? '<a href="'.esc_url($supplier_post_link).'" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#FFD700;color:#1B2A4E;text-decoration:none;margin-left:8px">Edycja wizytówki</a>' : '')
-                      . '</p>'
+                      . '<strong>NIP:</strong> '.esc_html($nip_raw).'<br>'
+                      . '<strong>Adres:</strong> '.esc_html($street.', '.$postcode.' '.$city).'<br>'
+                      . '<strong>Status VAT:</strong> '.esc_html(sanitize_text_field(bm_post('bm_company_vat_status'))).'</p>'
+                      . '<p><strong>Realizujemy na CITO:</strong> '.esc_html((int) bm_get_supplier_field($post_id, 'bm_cito_now', 0) === 1 ? 'Tak' : 'Nie').'</p>'
+                      . '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop($desc)).'</p>'
+                      . '<p><strong>Branże:</strong> '.esc_html(!empty($industries_names) ? implode(', ', $industries_names) : '—').'<br>'
+                      . '<strong>Specjalizacje:</strong> '.esc_html(!empty($specializations_names) ? implode(', ', $specializations_names) : '—').'<br>'
+                      . '<strong>Lokalizacje:</strong> '.esc_html(!empty($locations_names) ? implode(', ', $locations_names) : '—').'<br>'
+                      . '<strong>Termin realizacji:</strong> '.esc_html(!empty($terms_names) ? implode(', ', $terms_names) : '—').'<br>'
+                      . '<strong>Budżet:</strong> '.esc_html(!empty($budgets_names) ? implode(', ', $budgets_names) : '—').'<br>'
+                      . '<strong>Opiekun klienta:</strong> '.esc_html(trim($op_name.' / '.$op_role.' / '.$op_email.' / '.$op_phone, ' /')).'</p>'
+                      . '<p><strong>Profil użytkownika:</strong> '.esc_html($user_panel_link).'</p>'
+                      . ($supplier_post_link ? '<p><strong>Link do edycji wizytówki:</strong> '.esc_html($supplier_post_link).'</p>' : '')
                       . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
                       . '<p style="color:#666;font-size:12px;margin:0">BrandManager – powiadomienie systemowe.</p>'
                       . '</div></div>';
@@ -309,6 +452,10 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
         }
     } elseif ($status === 'rejected'){
         echo '<p>Status: <strong>Do poprawy</strong> – popraw dane i wyślij ponownie do akceptacji.</p>';
+        $reject_reason = get_user_meta($user->ID, 'bm_supplier_reject_reason', true);
+        if ($reject_reason){
+            echo '<div class="bm-alert bm-alert--error bm-reject-reason"><strong>Powód odrzucenia:</strong><br>'.wp_kses_post(nl2br(esc_html($reject_reason))).'</div>';
+        }
     }
     if (!empty($errors)){
         echo '<div class="bm-alert bm-alert--error"><ul>'; foreach($errors as $e){ echo '<li>'.esc_html($e).'</li>'; } echo '</ul></div>';
@@ -319,12 +466,29 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '</div>';
 
     // wartości do formularza
+    $is_premium = bm_user_has_premium($user->ID);
+    $max_taxonomy_items = $is_premium ? 6 : 3;
+    $upgrade_link = '<a href="https://brandmanager.cfolks.pl/premium/" class="bm-premium-link" target="_blank" rel="noopener">Ulepsz</a> ->';
+
+    $premium_desc_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać 1500 znaków opisu. W koncie Standard to tylko 200 znaków.'
+        : 'W wersji darmowej limit opisu to 200 znaków. W pakiecie Premium: 1500 znaków. '.$upgrade_link;
+
+    $premium_spec_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać aż o 3 specjalizacje więcej niż konto standardowe.'
+        : 'W Premium możesz wybrać do 6 specjalizacji. '.$upgrade_link;
+
+    $premium_ind_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać aż o 3 branże więcej niż konto standardowe.'
+        : 'W Premium możesz wybrać do 6 branż. '.$upgrade_link;
+
     $v_company_name = bm_get_supplier_field($post_id,'nazwa_dostawca','');
     $v_street       = bm_get_supplier_field($post_id,'ulica_dostawca','');
     $v_postcode     = bm_get_supplier_field($post_id,'kod_pocztowy_dostawca','');
     $v_city         = bm_get_supplier_field($post_id,'miejscowosc_dostawca','');
     $v_nip          = bm_get_supplier_field($post_id,'nip_dostawca','');
     $v_www          = bm_get_supplier_field($post_id,'www_dostawca','');
+    $v_slogan       = bm_get_supplier_field($post_id,'slogan_dostawca','');
     $v_desc         = bm_get_supplier_field($post_id,'opis_dostawca','');
     $v_size         = bm_get_supplier_field($post_id,'wielkosc_firmy_dostawca','');
     $v_op_name      = bm_get_supplier_field($post_id,'opiekun_imie_nazwisko','');
@@ -335,6 +499,24 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     $v_awarded_text = bm_get_supplier_field($post_id,'nagradzani_opis','');
     $v_spec         = bm_get_supplier_field($post_id,'bm_specializations',[]);
     $v_ind          = bm_get_supplier_field($post_id,'bm_industries',[]);
+    $v_locations    = bm_get_supplier_field($post_id,'bm_locations',[]);
+    $v_term         = (int) bm_get_supplier_field($post_id,'bm_term',0);
+    $v_budget       = (int) bm_get_supplier_field($post_id,'bm_budget',0);
+    $v_regon        = bm_get_supplier_field($post_id,'regon_dostawca','');
+    $v_krs          = bm_get_supplier_field($post_id,'krs_dostawca','');
+    $v_vat_status   = bm_get_supplier_field($post_id,'vat_status_dostawca','');
+    $v_legal_form   = bm_get_supplier_field($post_id,'forma_prawna_dostawca','');
+    $v_cito_now     = (int) bm_get_supplier_field($post_id,'bm_cito_now',0);
+
+    echo '<form class="bm-form bm-form--supplier-cito" method="post">';
+    echo '<input type="hidden" name="bm_supplier_cito_only" value="1">';
+    wp_nonce_field('bm_supplier_cito_only','_bm_cito_nonce');
+    echo '<div class="bm-field bm-field--cito">';
+    echo '<label><input type="checkbox" name="bm_cito_now" value="1" '.checked($v_cito_now,1,false).'> <strong>Realizujemy na CITO</strong></label>';
+    echo '<div class="bm-help">Zaznaczając ten box jesteś widoczny w wynikach „na już”. Tę opcję możesz włączać/wyłączać niezależnie – bez wysyłki danych do ponownej akceptacji.</div>';
+    echo '</div>';
+    echo '<div class="bm-form__actions"><button type="submit" class="button bm-btn-submit">Zapisz status CITO</button></div>';
+    echo '</form>';
 
     echo '<form class="bm-form bm-form--supplier" method="post" enctype="multipart/form-data">';
     echo '<input type="hidden" name="bm_supplier_step2" value="1">';
@@ -346,16 +528,20 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '<div class="bm-grid bm-grid--2">';
 
     echo '<div class="bm-field bm-field--company-name"><label>Nazwa firmy <span class="bm-req">*</span></label><input type="text" name="bm_company_name" value="'.esc_attr($v_company_name).'" required></div>';
-    echo '<div class="bm-field bm-field--nip"><label>NIP <span class="bm-req">*</span></label><input type="text" name="bm_company_nip" value="'.esc_attr($v_nip).'" inputmode="numeric" required></div>';
+    echo '<div class="bm-field bm-field--nip"><label>NIP <span class="bm-req">*</span></label><div class="bm-nip-inline"><input type="text" name="bm_company_nip" value="'.esc_attr($v_nip).'" inputmode="numeric" required><button type="button" class="button bm-btn-nip-fetch" data-nonce="'.esc_attr(wp_create_nonce('bm_company_lookup_nonce')).'">Pobierz dane</button></div><div class="bm-help bm-help--nip-status"></div></div>';
     echo '<div class="bm-field bm-field--street"><label>Ulica i numer <span class="bm-req">*</span></label><input type="text" name="bm_company_street" value="'.esc_attr($v_street).'" required></div>';
     echo '<div class="bm-field bm-field--postcode"><label>Kod pocztowy <span class="bm-req">*</span></label><input type="text" name="bm_company_postcode" value="'.esc_attr($v_postcode).'" required></div>';
     echo '<div class="bm-field bm-field--city"><label>Miejscowość <span class="bm-req">*</span></label><input type="text" name="bm_company_city" value="'.esc_attr($v_city).'" required></div>';
+    echo '<div class="bm-field bm-field--vat"><label>Status VAT</label><input type="text" name="bm_company_vat_status" value="'.esc_attr($v_vat_status).'" readonly></div>';
+    echo '<div class="bm-field bm-field--regon"><label>REGON</label><input type="text" name="bm_company_regon" value="'.esc_attr($v_regon).'" readonly></div>';
+    echo '<div class="bm-field bm-field--krs"><label>KRS</label><input type="text" name="bm_company_krs" value="'.esc_attr($v_krs).'" readonly></div>';
+    echo '<div class="bm-field bm-field--legal"><label>Forma prawna</label><input type="text" name="bm_company_legal_form" value="'.esc_attr($v_legal_form).'" readonly></div>';
 
     echo '</div>'; // grid
 
     echo '<div class="bm-grid bm-grid--2">';
-    echo '<div class="bm-field bm-field--logo"><label>Logo firmy</label><input type="file" name="bm_company_logo" accept="image/*"><div class="bm-help">Maksymalny rozmiar pliku: 128KB. Format: JPG/PNG/WEBP.</div></div>';
-    echo '<div class="bm-field bm-field--photo"><label>Zdjęcie firmy</label><input type="file" name="bm_company_photo" accept="image/*"><div class="bm-help">Najlepiej wykadruj zdjęcie tak, aby główna treść była na środku. Maksymalny rozmiar: 128KB.</div></div>';
+    echo '<div class="bm-field bm-field--logo"><label>Logo firmy</label><input type="file" name="bm_company_logo" accept="image/*" data-max-kb="256"><div class="bm-help">Maksymalny rozmiar pliku: 256KB. Format: JPG/PNG/WEBP.</div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
+    echo '<div class="bm-field bm-field--photo"><label>Zdjęcie firmy</label><input type="file" name="bm_company_photo" accept="image/*" data-max-kb="256"><div class="bm-help">Najlepiej wykadruj zdjęcie tak, aby główna treść była na środku. Maksymalny rozmiar: 256KB. Twój obrazek będzie wykadrowany do koła.</div><div class="bm-photo-preview"><span>Podgląd zdjęcia w kole</span></div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
     echo '</div>';
 
     echo '</div>'; // section
@@ -365,6 +551,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
 
     echo '<div class="bm-grid bm-grid--2">';
     echo '<div class="bm-field bm-field--www"><label>Strona WWW</label><input type="url" name="bm_company_www" value="'.esc_attr($v_www).'" placeholder="https://..."></div>';
+    echo '<div class="bm-field bm-field--slogan"><label>Slogan firmy (max 45 znaków)</label><input type="text" name="bm_company_slogan" value="'.esc_attr($v_slogan).'" maxlength="45"></div>';
     echo '<div class="bm-field bm-field--size"><label>Wielkość firmy</label>';
     echo '<select name="bm_company_size">';
     $sizes = ['' => '— wybierz —','do 5 pracowników'=>'do 5 pracowników','5-10 pracowników'=>'5-10 pracowników','10-20 pracowników'=>'10-20 pracowników','ponad 20 pracowników'=>'ponad 20 pracowników'];
@@ -374,7 +561,7 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
 
     echo '<div class="bm-field bm-field--desc">';
     echo '<label>Opis firmy</label>';
-    echo '<div class="bm-premium-note bm-premium-note--green">W wersji darmowej limit opisu to <strong>200 znaków</strong>. W pakiecie Premium: <strong>1500 znaków</strong>.</div>';
+    echo '<div class="bm-premium-note bm-premium-note--green">'.wp_kses_post($premium_desc_note).'</div>';
     wp_editor($v_desc, 'bm_company_description', [
         'textarea_name' => 'bm_company_description',
         'media_buttons' => false,
@@ -399,19 +586,64 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
     echo '</div>';
 
     echo '<div class="bm-grid bm-grid--2">';
-    echo '<div class="bm-field bm-field--spec"><label>Specjalizacja (max 3)</label>';
-    bm_render_tax_tree('dostawca_kategoria','bm_specializations',$v_spec,3);
+    echo '<div class="bm-field bm-field--spec"><label>Specjalizacja (max '.(int)$max_taxonomy_items.')</label>';
+    bm_render_tax_tree('dostawca_kategoria','bm_specializations',$v_spec,$max_taxonomy_items);
+    echo '<div class="bm-premium-note">'.wp_kses_post($premium_spec_note).'</div>';
     echo '</div>';
-    echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max 3)</label>';
-    bm_render_tax_tree('dostawca_kategoria','bm_industries',$v_ind,3);
-    echo '<div class="bm-premium-note">W Premium możesz wybrać do <strong>6</strong> branż.</div>';
+    echo '<div class="bm-field bm-field--industries"><label>Doświadczenie w branżach (max '.(int)$max_taxonomy_items.')</label>';
+    bm_render_tax_tree('dostawca_branza','bm_industries',$v_ind,$max_taxonomy_items);
+    echo '<div class="bm-premium-note">'.wp_kses_post($premium_ind_note).'</div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="bm-grid bm-grid--2">';
+    echo '<div class="bm-field bm-field--locations"><label>Lokalizacje (max 3)</label>';
+    bm_render_tax_tree('dostawca_lokalizacja','bm_locations',$v_locations,3);
+    echo '</div>';
+
+    echo '<div class="bm-field bm-field--term"><label>Terminy realizacji (jedno do wyboru)</label>';
+    $term_options = get_terms(['taxonomy' => 'dostawca_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+    echo '<select name="bm_term">';
+    echo '<option value="0">— wybierz —</option>';
+    if (!is_wp_error($term_options)){
+        foreach($term_options as $term_opt){
+            echo '<option value="'.esc_attr((int)$term_opt->term_id).'" '.selected($v_term, (int)$term_opt->term_id, false).'>'.esc_html($term_opt->name).'</option>';
+        }
+    }
+    echo '</select>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="bm-grid bm-grid--2">';
+    echo '<div class="bm-field bm-field--budget"><label>Budżety (jedno do wyboru)</label>';
+    $budget_options = get_terms(['taxonomy' => 'dostawca_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+    echo '<select name="bm_budget">';
+    echo '<option value="0">— wybierz —</option>';
+    if (!is_wp_error($budget_options)){
+        foreach($budget_options as $budget_opt){
+            echo '<option value="'.esc_attr((int)$budget_opt->term_id).'" '.selected($v_budget, (int)$budget_opt->term_id, false).'>'.esc_html($budget_opt->name).'</option>';
+        }
+    }
+    echo '</select>';
     echo '</div>';
     echo '</div>';
 
     echo '<div class="bm-field bm-field--awarded">';
     echo '<label><input type="checkbox" name="bm_awarded" value="1" '.checked($v_awarded,1,false).'> Nagradzani w konkursach</label>';
     echo '<div class="bm-field bm-field--awarded-text" style="margin-top:10px;'.($v_awarded? '':'display:none;').'">';
-    echo '<label>Opisz nagrody</label><textarea name="bm_awarded_text" rows="4">'.esc_textarea($v_awarded_text).'</textarea></div>';
+    echo '<label>Opisz nagrody</label>';
+    wp_editor($v_awarded_text, 'bm_awarded_text_editor', [
+        'textarea_name' => 'bm_awarded_text',
+        'media_buttons' => false,
+        'teeny'         => true,
+        'textarea_rows' => 5,
+    ]);
+    echo '</div>';
+    echo '</div>';
+
+    $confirm_checked = (!empty($_POST['bm_confirm_company_data']) || $_SERVER['REQUEST_METHOD'] !== 'POST') ? 1 : 0;
+    echo '<div class="bm-field bm-field--confirm">';
+    echo '<label><input type="checkbox" name="bm_confirm_company_data" value="1" '.checked($confirm_checked,1,false).' required> Potwierdzam poprawność danych firmy i NIP.</label>';
     echo '</div>';
 
     echo '</div>'; // section
@@ -427,21 +659,140 @@ add_action('woocommerce_account_supplier-data_endpoint', function(){
       function initTree(root){
         var max = parseInt(root.getAttribute("data-max"),10)||3;
         var cbs = root.querySelectorAll("input[type=checkbox]");
+
+        cbs.forEach(function(cb){
+          if(cb.disabled && !cb.name){
+            cb.dataset.permanentDisabled = "1";
+          }
+        });
+
         function enforce(){
           var checked = root.querySelectorAll("input[type=checkbox]:checked");
           if(checked.length>=max){
-            cbs.forEach(function(cb){ if(!cb.checked){ cb.disabled=true; cb.parentElement.classList.add("is-disabled"); } });
+            cbs.forEach(function(cb){
+              if(cb.dataset.permanentDisabled === "1") return;
+              if(!cb.checked){
+                cb.disabled=true;
+                cb.parentElement.classList.add("is-disabled");
+              }
+            });
           }else{
-            cbs.forEach(function(cb){ cb.disabled=false; cb.parentElement.classList.remove("is-disabled"); });
+            cbs.forEach(function(cb){
+              if(cb.dataset.permanentDisabled === "1") return;
+              cb.disabled=false;
+              cb.parentElement.classList.remove("is-disabled");
+            });
           }
         }
-        cbs.forEach(function(cb){ cb.addEventListener("change", enforce); });
+        cbs.forEach(function(cb){
+          if(cb.dataset.permanentDisabled === "1") return;
+          cb.addEventListener("change", enforce);
+        });
         enforce();
       }
       document.querySelectorAll(".bm-tax-tree").forEach(initTree);
       var aw = document.querySelector("input[name=bm_awarded]");
       var box = document.querySelector(".bm-field--awarded-text");
       if(aw && box){ aw.addEventListener("change", function(){ box.style.display = this.checked?"block":"none"; }); }
+
+      var form = document.querySelector(".bm-form--supplier");
+      var nipButton = document.querySelector(".bm-btn-nip-fetch");
+      if(form && nipButton){
+        var nipInput = form.querySelector("input[name=bm_company_nip]");
+        var statusEl = form.querySelector(".bm-help--nip-status");
+        var companyInput = form.querySelector("input[name=bm_company_name]");
+        var streetInput = form.querySelector("input[name=bm_company_street]");
+        var postcodeInput = form.querySelector("input[name=bm_company_postcode]");
+        var cityInput = form.querySelector("input[name=bm_company_city]");
+        var regonInput = form.querySelector("input[name=bm_company_regon]");
+        var krsInput = form.querySelector("input[name=bm_company_krs]");
+        var vatInput = form.querySelector("input[name=bm_company_vat_status]");
+        var legalInput = form.querySelector("input[name=bm_company_legal_form]");
+        var photoInput = form.querySelector("input[name=bm_company_photo]");
+        var photoPreview = form.querySelector(".bm-photo-preview");
+        var ajaxUrl = "' . esc_js(admin_url('admin-ajax.php')) . '";
+
+        if(photoInput && photoPreview){
+          photoInput.addEventListener("change", function(){
+            var file = this.files && this.files[0] ? this.files[0] : null;
+            if(!file) return;
+            if(file.size > 262144){
+              var err = this.parentElement.querySelector(".bm-help--file-error");
+              if(err){ err.textContent = "Plik jest za duży. Maksymalny rozmiar: 256KB."; }
+              this.value = "";
+              photoPreview.classList.remove("is-filled");
+              photoPreview.style.backgroundImage = "none";
+              return;
+            }
+            var err = this.parentElement.querySelector(".bm-help--file-error");
+            if(err){ err.textContent = ""; }
+            var reader = new FileReader();
+            reader.onload = function(e){
+              photoPreview.style.backgroundImage = "url(" + e.target.result + ")";
+              photoPreview.classList.add("is-filled");
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+
+        var logoInput = form.querySelector("input[name=bm_company_logo]");
+        if(logoInput){
+          logoInput.addEventListener("change", function(){
+            var file = this.files && this.files[0] ? this.files[0] : null;
+            if(!file) return;
+            var err = this.parentElement.querySelector(".bm-help--file-error");
+            if(file.size > 262144){
+              if(err){ err.textContent = "Plik jest za duży. Maksymalny rozmiar: 256KB."; }
+              this.value = "";
+              return;
+            }
+            if(err){ err.textContent = ""; }
+          });
+        }
+
+        nipButton.addEventListener("click", function(){
+          var nip = (nipInput && nipInput.value ? nipInput.value : "").replace(/\D+/g, "");
+          if(nip.length !== 10){
+            if(statusEl){ statusEl.textContent = "Wpisz poprawny NIP (10 cyfr)."; }
+            return;
+          }
+
+          if(statusEl){ statusEl.textContent = "Pobieram dane z rejestru..."; }
+          nipButton.disabled = true;
+
+          var fd = new FormData();
+          fd.append("action", "bm_company_lookup");
+          fd.append("nonce", nipButton.getAttribute("data-nonce") || "");
+          fd.append("nip", nip);
+
+          fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+            .then(function(resp){ return resp.json(); })
+            .then(function(json){
+              if(!json || !json.success){
+                var msg = (json && json.data && json.data.message) ? json.data.message : "Nie udało się pobrać danych. Uzupełnij ręcznie.";
+                if(statusEl){ statusEl.textContent = msg; }
+                return;
+              }
+
+              var data = (json.data && json.data.data) ? json.data.data : {};
+              if(companyInput && data.company_name && !companyInput.value){ companyInput.value = data.company_name; }
+              if(streetInput && data.street && !streetInput.value){ streetInput.value = data.street; }
+              if(postcodeInput && data.postal_code && !postcodeInput.value){ postcodeInput.value = data.postal_code; }
+              if(cityInput && data.city && !cityInput.value){ cityInput.value = data.city; }
+              if(regonInput){ regonInput.value = data.regon || ""; }
+              if(krsInput){ krsInput.value = data.krs || ""; }
+              if(vatInput){ vatInput.value = data.status_vat || ""; }
+              if(legalInput){ legalInput.value = data.legal_form || ""; }
+              if(statusEl){ statusEl.textContent = "Dane pobrane. Sprawdź i potwierdź przed zapisaniem."; }
+            })
+            .catch(function(){
+              if(statusEl){ statusEl.textContent = "Błąd połączenia. Uzupełnij dane ręcznie."; }
+            })
+            .finally(function(){
+              nipButton.disabled = false;
+            });
+        });
+      }
     })();</script>';
 });
 
@@ -455,7 +806,8 @@ add_action('edit_user_profile', function($user){
     $post_id = bm_get_or_create_supplier_post($user->ID);
     $status  = get_post_status($post_id) ?: 'draft';
 
-    echo '<h2>Dane Wykonawcy – akceptacja</h2>';
+    echo '<h2 style="margin:0;padding:12px 14px;background:#282a36;color:#fff;border-radius:8px;">Dane Wykonawcy – akceptacja</h2>';
+    echo '<p style="margin:10px 0 14px;padding:10px 12px;border:1px solid #47c0c7;border-radius:8px;background:#f4fdfe;">Sekcja weryfikacji znajduje się na górze profilu. Poniżej widzisz status i komplet danych do decyzji.</p>';
 
     echo '<table class="form-table"><tbody>';
 
@@ -469,21 +821,40 @@ add_action('edit_user_profile', function($user){
     echo '<option value="publish" '.selected($status,'publish',false).'>Zaakceptowane</option>';
     echo '<option value="rejected" '.selected($status,'rejected',false).'>Odrzucone</option>';
     echo '</select>';
+    $reject_reason_admin = get_user_meta($user->ID, 'bm_supplier_reject_reason', true);
+    echo '<p style="margin-top:8px"><label for="bm_supplier_reject_reason"><strong>Powód odrzucenia (opcjonalnie)</strong></label><br><textarea name="bm_supplier_reject_reason" id="bm_supplier_reject_reason" rows="4" style="width:100%;max-width:640px">'.esc_textarea($reject_reason_admin).'</textarea></p>';
 
     $public_link = get_permalink($post_id);
-    $edit_post_link = get_edit_post_link($post_id,'');
     echo '<p class="description">';
     echo 'Aktualny status: <strong>'.esc_html($status).'</strong>. ';
     if ($public_link && $status === 'publish'){
         echo 'Publiczna wizytówka: <a href="'.esc_url($public_link).'" target="_blank">'.esc_html($public_link).'</a><br>';
     }
-    if ($edit_post_link){
-        echo 'Edycja wpisu "dostawca": <a href="'.esc_url($edit_post_link).'" target="_blank">Otwórz w nowej karcie</a>';
-    }
     echo '</p>';
 
     echo '</td>';
     echo '</tr>';
+
+    echo '<tr><th>Dane do akceptacji</th><td>';
+    echo '<div style="border:1px solid #EE2356;border-radius:10px;padding:12px;background:#fff7f9">';
+    echo '<p><strong>Firma:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'nazwa_dostawca','—')).'</p>';
+    echo '<p><strong>Slogan:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'slogan_dostawca','—')).'</p>';
+    echo '<p><strong>Realizujemy na CITO:</strong> '.esc_html((int) bm_get_supplier_field($post_id,'bm_cito_now',0) === 1 ? 'Tak' : 'Nie').'</p>';
+    echo '<p><strong>Adres:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'ulica_dostawca','')).', '.esc_html((string) bm_get_supplier_field($post_id,'kod_pocztowy_dostawca','')).' '.esc_html((string) bm_get_supplier_field($post_id,'miejscowosc_dostawca','')).'</p>';
+    echo '<p><strong>Opis firmy:</strong><br>'.wp_kses_post(wpautop((string) bm_get_supplier_field($post_id,'opis_dostawca',''))).'</p>';
+    $admin_spec = wp_get_post_terms($post_id, 'dostawca_kategoria', ['fields' => 'names']);
+    $admin_ind = wp_get_post_terms($post_id, 'dostawca_branza', ['fields' => 'names']);
+    $admin_locations = wp_get_post_terms($post_id, 'dostawca_lokalizacja', ['fields' => 'names']);
+    $admin_term = wp_get_post_terms($post_id, 'dostawca_termin', ['fields' => 'names']);
+    $admin_budget = wp_get_post_terms($post_id, 'dostawca_budzet', ['fields' => 'names']);
+    echo '<p><strong>Branże:</strong> '.esc_html(!empty($admin_ind) ? implode(', ', $admin_ind) : '—').'</p>';
+    echo '<p><strong>Specjalizacje:</strong> '.esc_html(!empty($admin_spec) ? implode(', ', $admin_spec) : '—').'</p>';
+    echo '<p><strong>Lokalizacje:</strong> '.esc_html(!empty($admin_locations) ? implode(', ', $admin_locations) : '—').'</p>';
+    echo '<p><strong>Termin realizacji:</strong> '.esc_html(!empty($admin_term) ? implode(', ', $admin_term) : '—').'</p>';
+    echo '<p><strong>Budżet:</strong> '.esc_html(!empty($admin_budget) ? implode(', ', $admin_budget) : '—').'</p>';
+    echo '<p><strong>Opiekun:</strong> '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_imie_nazwisko','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_stanowisko','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_email','—')).' / '.esc_html((string) bm_get_supplier_field($post_id,'opiekun_telefon','—')).'</p>';
+    echo '</div>';
+    echo '</td></tr>';
 
     // Podgląd: logo + zdjęcie firmy (jeśli istnieją)
     $logo_id  = 0;
@@ -577,7 +948,7 @@ add_action('edit_user_profile', function($user){
     }
 
     echo '</tbody></table>';
-});
+}, 1);
 
 /* Zapis decyzji superadmina */
 add_action('personal_options_update','bm_save_supplier_admin_decision');
@@ -590,12 +961,13 @@ function bm_save_supplier_admin_decision($user_id){
     $user_id = (int)$user_id;
     $post_id = bm_get_or_create_supplier_post($user_id);
 
-    $new_status = sanitize_text_field($_POST['bm_supplier_status']);
+$new_status = sanitize_text_field($_POST['bm_supplier_status']);
+    $reject_reason = isset($_POST['bm_supplier_reject_reason']) ? sanitize_textarea_field(wp_unslash($_POST['bm_supplier_reject_reason'])) : '';
     $allowed    = ['draft','pending','publish','rejected'];
     if (!in_array($new_status, $allowed, true)) return;
 
     $old_status = get_post_status($post_id);
-    if ($old_status === $new_status) return;
+if ($old_status === $new_status && $new_status !== 'rejected') return;
 
     wp_update_post([
         'ID'          => $post_id,
@@ -606,7 +978,8 @@ function bm_save_supplier_admin_decision($user_id){
     if (!$user) return;
 
     // Jeśli akceptacja → snapshot i mail
-    if ($new_status === 'publish'){
+if ($new_status === 'publish'){
+        update_user_meta($user_id, 'bm_supplier_reject_reason', '');
 
         if (function_exists('get_fields')){
             $fields = get_fields($post_id);
@@ -621,7 +994,7 @@ function bm_save_supplier_admin_decision($user_id){
               . '<p>Twoje dane Wykonawcy zostały zaakceptowane przez administrację.</p>'
               . '<p>Twoja wizytówka jest już widoczna publicznie.</p>'
               . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
-              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna.</p>'
+              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna. Prosimy nie odpowiadać na tę wiadomość.</p>'
               . '</div></div>';
         bm_send_html_mail(
             $user->user_email,
@@ -631,14 +1004,16 @@ function bm_save_supplier_admin_decision($user_id){
         );
 
     } elseif ($new_status === 'rejected'){
+        update_user_meta($user_id, 'bm_supplier_reject_reason', $reject_reason);
 
         $html = '<div style="font-family:Arial,sans-serif;line-height:1.5">'
               . '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px;max-width:700px">'
               . '<h2 style="margin:0 0 10px">Twoje dane wymagają poprawek</h2>'
               . '<p>Twoje dane Wykonawcy zostały odrzucone.</p>'
               . '<p>Zaloguj się do panelu, popraw dane i wyślij je ponownie do akceptacji.</p>'
+              . (!empty($reject_reason) ? '<p><strong>Powód odrzucenia:</strong><br>' . nl2br(esc_html($reject_reason)) . '</p>' : '')
               . '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
-              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna.</p>'
+              . '<p style="color:#666;font-size:12px;margin:0">BrandManager – wiadomość automatyczna. Prosimy nie odpowiadać na tę wiadomość.</p>'
               . '</div></div>';
         bm_send_html_mail(
             $user->user_email,
@@ -696,6 +1071,14 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
     }
 
     $offer_limit = 3;
+    $is_premium = bm_user_has_premium($user->ID);
+    $offer_limit_effective = $is_premium ? 6 : $offer_limit;
+    $offer_cat_limit = 3;
+    $offer_upgrade_link = '<a href="https://brandmanager.cfolks.pl/premium/" class="bm-premium-link" target="_blank" rel="noopener">Ulepsz</a> ->';
+
+    $offer_limit_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać aż o 3 oferty więcej niż konto standardowe.'
+        : 'W planie darmowym możesz dodać maksymalnie <strong>3</strong> oferty. '.$offer_upgrade_link;
 
     $offers = get_posts([
         'post_type'   => 'dostawca_oferta',
@@ -716,25 +1099,41 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
         $edit_id = (int) $_GET['edit_offer'];
     }
 
-    echo '<div style="background:#fff;padding:16px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:20px;">';
-    echo '<h2 style="margin-top:0;">Twoje oferty</h2>';
-    echo '<p>W planie darmowym możesz dodać maksymalnie <strong>'.$offer_limit.'</strong> ofert(y). 
-          Obecnie masz: <strong>'.$offers_count.'</strong>.</p>';
-    echo '<p><button type="button" class="button" style="margin-top:8px;">Zwiększ limit (wkrótce)</button></p>';
+    echo '<div class="bm-box bm-box--account">';
+    echo '<h2 class="bm-account-title">Twoje oferty</h2>';
+    echo '<div class="bm-premium-note">'.wp_kses_post($offer_limit_note).'</div>';
+    echo '<p>Obecnie masz: <strong>'.$offers_count.'</strong> / <strong>'.$offer_limit_effective.'</strong>.</p>';
     echo '</div>';
 
     if ($mode === 'new'){
 
-        if ($offers_count >= $offer_limit){
-            echo '<div style="background:#fffbe6;padding:12px;border-radius:6px;border:1px solid #faad14;margin-bottom:24px;">
-                    Osiągnąłeś limit '.$offer_limit.' ofert w planie darmowym.
-                  </div>';
-            echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Wróć do listy ofert</a></p>';
+        if ($offers_count >= $offer_limit_effective){
+            echo '<div class="bm-alert bm-alert--error">Osiągnąłeś limit '.$offer_limit_effective.' ofert dla aktualnego planu.</div>';
+            echo '<p><a class="button bm-btn-submit" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Wróć do listy ofert</a></p>';
             return;
         }
 
-        echo '<div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:24px;">';
-        echo '<h3 style="margin-top:0;">Dodaj nową ofertę</h3>';
+        echo '<div class="bm-form bm-form--supplier bm-form--offer">';
+        echo '<h3 class="bm-form__h">Dodaj nową ofertę</h3>';
+        echo '<div class="bm-field bm-field--offer-title"><label>Tytuł oferty</label><input type="text" name="bm_offer_title" value="" required maxlength="180"></div>';
+        echo '<div class="bm-field bm-field--offer-cats"><label>Kategoria oferty (max '.(int)$offer_cat_limit.')</label>';
+        bm_render_tax_tree('dostawca_kategoria','bm_offer_categories',[],$offer_cat_limit);
+        echo '</div>';
+        echo '<div class="bm-field bm-field--offer-spec"><label>Specjalizacja oferty (max '.(int)$offer_cat_limit.')</label>';
+        bm_render_tax_tree('oferta_specjalizacja','bm_offer_specializations',[],$offer_cat_limit);
+        echo '</div>';
+        echo '<div class="bm-field bm-field--offer-term"><label>Termin realizacji</label>';
+        $offer_term_options = get_terms(['taxonomy' => 'oferta_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        echo '<select name="bm_offer_term"><option value="0">— wybierz —</option>';
+        if (!is_wp_error($offer_term_options)){ foreach($offer_term_options as $term_opt){ echo '<option value="'.esc_attr((int)$term_opt->term_id).'">'.esc_html($term_opt->name).'</option>'; } }
+        echo '</select></div>';
+        echo '<div class="bm-field bm-field--offer-budget"><label>Stawka / Budżet</label>';
+        $offer_budget_options = get_terms(['taxonomy' => 'oferta_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        echo '<select name="bm_offer_budget"><option value="0">— wybierz —</option>';
+        if (!is_wp_error($offer_budget_options)){ foreach($offer_budget_options as $budget_opt){ echo '<option value="'.esc_attr((int)$budget_opt->term_id).'">'.esc_html($budget_opt->name).'</option>'; } }
+        echo '</select></div>';
+        echo '<div class="bm-field bm-field--offer-image-note"><label>Obrazek oferty</label><input type="file" name="bm_offer_image" accept="image/*" data-max-kb="256"><div class="bm-help">Obrazek oferty: maks. 256KB. Po wyborze zobaczysz podgląd kołowy.</div><div class="bm-photo-preview bm-offer-photo-preview"><span>Podgląd obrazka w kole</span></div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
+        echo '</div>';
 
         acf_form([
             'post_id'          => 'new_post',
@@ -743,17 +1142,18 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
                 'post_status' => 'publish',
                 'post_author' => $user->ID,
             ],
-            'post_title'       => true,
+            'post_title'       => false,
             'post_content'     => false,
             'uploader'         => 'wp',
             'return'           => wc_get_account_endpoint_url('supplier-offers'),
             'submit_value'     => 'Zapisz ofertę',
             'updated_message'  => 'Oferta została zapisana.',
             'label_placement'  => 'top',
-            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" />',
+            'html_before_fields'=> '<div class="bm-offer-form-acf">',
+            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" /></div>',
         ]);
 
-        echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'" style="margin-top:10px;">Anuluj</a></p>';
+        echo '<p><a class="button bm-btn-submit" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Anuluj</a></p>';
         echo '</div>';
 
         return;
@@ -763,15 +1163,40 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
 
         $offer = get_post($edit_id);
         if (!$offer || $offer->post_type !== 'dostawca_oferta' || (int)$offer->post_author !== $user->ID){
-            echo '<div style="background:#fff1f0;padding:12px;border-radius:6px;border:1px solid #f5222d;margin-bottom:12px;">
-                    Nie możesz edytować tej oferty.
-                  </div>';
-            echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Wróć do listy ofert</a></p>';
+            echo '<div class="bm-alert bm-alert--error">Nie możesz edytować tej oferty.</div>';
+            echo '<p><a class="button bm-btn-submit" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Wróć do listy ofert</a></p>';
             return;
         }
 
-        echo '<div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:24px;">';
-        echo '<h3 style="margin-top:0;">Edytuj ofertę: '.esc_html(get_the_title($offer)).'</h3>';
+        echo '<div class="bm-form bm-form--supplier bm-form--offer">';
+        echo '<h3 class="bm-form__h">Edytuj ofertę: '.esc_html(get_the_title($offer)).'</h3>';
+        echo '<div class="bm-field bm-field--offer-title"><label>Tytuł oferty</label><input type="text" name="bm_offer_title" value="'.esc_attr(get_the_title($offer)).'" required maxlength="180"></div>';
+        $offer_selected_cats = wp_get_post_terms($offer->ID, 'dostawca_kategoria', ['fields' => 'ids']);
+        if (is_wp_error($offer_selected_cats)) { $offer_selected_cats = []; }
+        $offer_selected_specs = wp_get_post_terms($offer->ID, 'oferta_specjalizacja', ['fields' => 'ids']);
+        if (is_wp_error($offer_selected_specs)) { $offer_selected_specs = []; }
+        echo '<div class="bm-field bm-field--offer-cats"><label>Kategoria oferty (max '.(int)$offer_cat_limit.')</label>';
+        bm_render_tax_tree('dostawca_kategoria','bm_offer_categories',$offer_selected_cats,$offer_cat_limit);
+        echo '</div>';
+        echo '<div class="bm-field bm-field--offer-spec"><label>Specjalizacja oferty (max '.(int)$offer_cat_limit.')</label>';
+        bm_render_tax_tree('oferta_specjalizacja','bm_offer_specializations',$offer_selected_specs,$offer_cat_limit);
+        echo '</div>';
+        $offer_selected_term = wp_get_post_terms($offer->ID, 'oferta_termin', ['fields' => 'ids']);
+        if (is_wp_error($offer_selected_term) || empty($offer_selected_term)) { $offer_selected_term = [0]; }
+        $offer_selected_budget = wp_get_post_terms($offer->ID, 'oferta_budzet', ['fields' => 'ids']);
+        if (is_wp_error($offer_selected_budget) || empty($offer_selected_budget)) { $offer_selected_budget = [0]; }
+        echo '<div class="bm-field bm-field--offer-term"><label>Termin realizacji</label>';
+        $offer_term_options = get_terms(['taxonomy' => 'oferta_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        echo '<select name="bm_offer_term"><option value="0">— wybierz —</option>';
+        if (!is_wp_error($offer_term_options)){ foreach($offer_term_options as $term_opt){ echo '<option value="'.esc_attr((int)$term_opt->term_id).'" '.selected((int)$offer_selected_term[0], (int)$term_opt->term_id, false).'>'.esc_html($term_opt->name).'</option>'; } }
+        echo '</select></div>';
+        echo '<div class="bm-field bm-field--offer-budget"><label>Stawka / Budżet</label>';
+        $offer_budget_options = get_terms(['taxonomy' => 'oferta_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        echo '<select name="bm_offer_budget"><option value="0">— wybierz —</option>';
+        if (!is_wp_error($offer_budget_options)){ foreach($offer_budget_options as $budget_opt){ echo '<option value="'.esc_attr((int)$budget_opt->term_id).'" '.selected((int)$offer_selected_budget[0], (int)$budget_opt->term_id, false).'>'.esc_html($budget_opt->name).'</option>'; } }
+        echo '</select></div>';
+        echo '<div class="bm-field bm-field--offer-image-note"><label>Obrazek oferty</label><input type="file" name="bm_offer_image" accept="image/*" data-max-kb="256"><div class="bm-help">Obrazek oferty: maks. 256KB. Po wyborze zobaczysz podgląd kołowy.</div><div class="bm-photo-preview bm-offer-photo-preview"><span>Podgląd obrazka w kole</span></div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
+        echo '</div>';
 
         $delete_url = wp_nonce_url(
             add_query_arg('delete_supplier_offer', $edit_id, wc_get_account_endpoint_url('supplier-offers')),
@@ -780,24 +1205,24 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
 
         acf_form([
             'post_id'          => $edit_id,
-            'post_title'       => true,
+            'post_title'       => false,
             'post_content'     => false,
             'uploader'         => 'wp',
             'return'           => wc_get_account_endpoint_url('supplier-offers'),
             'submit_value'     => 'Zapisz zmiany',
             'updated_message'  => 'Oferta została zaktualizowana.',
             'label_placement'  => 'top',
-            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" />',
+            'html_before_fields'=> '<div class="bm-offer-form-acf">',
+            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" /></div>',
         ]);
 
-        echo '<p style="margin-top:20px;">
+        echo '<p>
                 <a href="'.esc_url($delete_url).'"
-                   class="button"
-                   style="background:#c62828;color:#fff;border-color:#b71c1c;"
+                   class="button bm-btn-submit"
                    onclick="return confirm(\'Czy na pewno usunąć tę ofertę?\');">
                     Usuń ofertę
                 </a>
-                <a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'" style="margin-left:8px;">
+                <a class="button bm-btn-submit" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">
                     Wróć do listy ofert
                 </a>
               </p>';
@@ -807,30 +1232,30 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
         return;
     }
 
-    echo '<div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #e8e8e8;">';
-    echo '<h3 style="margin-top:0;">Lista Twoich ofert</h3>';
+    echo '<div class="bm-box bm-box--account bm-offers-list">';
+    echo '<h3 class="bm-form__h">Lista Twoich ofert</h3>';
 
-    if ($offers_count < $offer_limit){
+    if ($offers_count < $offer_limit_effective){
         $new_url = add_query_arg('new_offer', 1, wc_get_account_endpoint_url('supplier-offers'));
-        echo '<p><a class="button button-primary" href="'.esc_url($new_url).'">Dodaj nową ofertę</a></p>';
+        echo '<p><a class="button bm-btn-submit" href="'.esc_url($new_url).'">Dodaj nową ofertę</a></p>';
     } else {
-        echo '<p><strong>Masz już maksymalną liczbę ofert w planie darmowym.</strong></p>';
+        echo '<div class="bm-premium-note">Masz już maksymalną liczbę ofert dla aktualnego planu. '.wp_kses_post($offer_upgrade_link).'</div>';
     }
 
     if (empty($offers)){
         echo '<p>Nie masz jeszcze żadnych ofert.</p>';
     } else {
-        echo '<ul style="list-style:none;padding-left:0;margin-top:20px;">';
+        echo '<ul class="bm-offers-listing">';
         foreach($offers as $offer){
             $edit_link = add_query_arg('edit_offer', $offer->ID, wc_get_account_endpoint_url('supplier-offers'));
             $view_link = get_permalink($offer->ID);
 
-            echo '<li style="border-top:1px solid #e8e8e8;padding:12px 0;">';
+            echo '<li class="bm-offers-listing__item">';
             echo '<strong>'.esc_html(get_the_title($offer)).'</strong>';
-            echo '<div style="margin-top:6px;">';
-            echo '<a class="button" href="'.esc_url($edit_link).'">Edytuj</a> ';
+            echo '<div class="bm-offers-listing__actions">';
+            echo '<a class="button bm-btn-submit" href="'.esc_url($edit_link).'">Edytuj</a> ';
             if ($view_link){
-                echo '<a class="button" href="'.esc_url($view_link).'" target="_blank">Zobacz</a>';
+                echo '<a class="button bm-btn-submit" href="'.esc_url($view_link).'" target="_blank">Zobacz</a>';
             }
             echo '</div>';
             echo '</li>';
@@ -839,4 +1264,114 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
     }
 
     echo '</div>';
+
+    echo '<script>(function(){
+      var offerWrap = document.querySelector(".bm-form--offer");
+      if(!offerWrap) return;
+
+      function bindOfferLimit(fieldClass, max){
+        var root = offerWrap.querySelector(fieldClass + " .bm-tax-tree");
+        if(!root) return;
+        var boxes = root.querySelectorAll("input[type=checkbox]");
+        function enforce(){
+          var checked = root.querySelectorAll("input[type=checkbox]:checked").length;
+          boxes.forEach(function(cb){
+            if(!cb.checked){
+              cb.disabled = checked >= max;
+              cb.parentElement.classList.toggle("is-disabled", checked >= max);
+            }
+          });
+        }
+        boxes.forEach(function(cb){ cb.addEventListener("change", enforce); });
+        enforce();
+      }
+
+      bindOfferLimit(".bm-field--offer-cats", 3);
+      bindOfferLimit(".bm-field--offer-spec", 3);
+
+      var preview = offerWrap.querySelector(".bm-offer-photo-preview");
+      var fileErr = offerWrap.querySelector(".bm-field--offer-image-note .bm-help--file-error");
+      var imageInput = offerWrap.querySelector("input[name=\"bm_offer_image\"]");
+
+      if(imageInput){
+        imageInput.addEventListener("change", function(){
+          var f = this.files && this.files[0] ? this.files[0] : null;
+          if(!f) return;
+
+          if(f.size > 262144){
+            if(fileErr){ fileErr.textContent = "Plik jest za duży. Maksymalny rozmiar: 256KB."; }
+            this.value = "";
+            if(preview){
+              preview.style.backgroundImage = "none";
+              preview.classList.remove("is-filled");
+            }
+            return;
+          }
+
+          if(fileErr){ fileErr.textContent = ""; }
+          if(preview){
+            var reader = new FileReader();
+            reader.onload = function(e){
+              preview.style.backgroundImage = "url(" + e.target.result + ")";
+              preview.classList.add("is-filled");
+            };
+            reader.readAsDataURL(f);
+          }
+        });
+      }
+    })();</script>';
 });
+
+add_action('acf/save_post', function($post_id){
+    if (empty($_POST['bm_offer_form'])) return;
+    if (get_post_type($post_id) !== 'dostawca_oferta') return;
+    if (!is_user_logged_in()) return;
+
+    $user = wp_get_current_user();
+    if (!in_array('dostawca', (array) $user->roles, true)) return;
+
+    // Oferta zawsze przypisana do aktualnego wykonawcy
+    $supplier_post_id = bm_get_or_create_supplier_post($user->ID);
+    update_post_meta($post_id, 'powiazany_dostawca', (int) $supplier_post_id);
+    wp_update_post(['ID' => $post_id, 'post_author' => $user->ID]);
+
+    if (!empty($_POST['bm_offer_title'])) {
+        wp_update_post([
+            'ID'         => $post_id,
+            'post_title' => sanitize_text_field(wp_unslash($_POST['bm_offer_title'])),
+        ]);
+    }
+
+    if (!empty($_FILES['bm_offer_image']) && !empty($_FILES['bm_offer_image']['name'])) {
+        $uploaded = bm_handle_image_upload('bm_offer_image', 262144);
+        if ($uploaded > 0) {
+            set_post_thumbnail($post_id, (int) $uploaded);
+        }
+    }
+
+    // Kategorie oferty z taką samą logiką limitu jak w danych wykonawcy
+    $max_taxonomy_items = 3;
+    $offer_cats = isset($_POST['bm_offer_categories']) ? array_map('intval', (array) wp_unslash($_POST['bm_offer_categories'])) : [];
+    $offer_cats = array_values(array_filter($offer_cats));
+    if (count($offer_cats) > $max_taxonomy_items) {
+        $offer_cats = array_slice($offer_cats, 0, $max_taxonomy_items);
+    }
+    if (!empty($offer_cats)){
+        wp_set_object_terms($post_id, $offer_cats, 'dostawca_kategoria', false);
+    } else {
+        wp_set_object_terms($post_id, [], 'dostawca_kategoria', false);
+    }
+
+    $offer_specs = isset($_POST['bm_offer_specializations']) ? array_map('intval', (array) wp_unslash($_POST['bm_offer_specializations'])) : [];
+    $offer_specs = array_values(array_filter($offer_specs));
+    if (count($offer_specs) > $max_taxonomy_items) {
+        $offer_specs = array_slice($offer_specs, 0, $max_taxonomy_items);
+    }
+    wp_set_object_terms($post_id, $offer_specs, 'oferta_specjalizacja', false);
+
+    $offer_term = isset($_POST['bm_offer_term']) ? (int) wp_unslash($_POST['bm_offer_term']) : 0;
+    wp_set_object_terms($post_id, $offer_term ? [$offer_term] : [], 'oferta_termin', false);
+
+    $offer_budget = isset($_POST['bm_offer_budget']) ? (int) wp_unslash($_POST['bm_offer_budget']) : 0;
+    wp_set_object_terms($post_id, $offer_budget ? [$offer_budget] : [], 'oferta_budzet', false);
+}, 30);

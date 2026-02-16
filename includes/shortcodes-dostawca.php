@@ -100,6 +100,153 @@ add_shortcode( 'dostawca_pole', function( $atts ) {
     return esc_html( $value );
 });
 
+
+
+/* ==========================================================
+   2b️⃣ DEDYKOWANE SHORTCODY PÓL REJESTRACYJNYCH/WIZYTÓWKI
+   ========================================================== */
+
+if ( ! function_exists( 'bm_get_supplier_field_value' ) ) {
+    function bm_get_supplier_field_value( $supplier_id, $key ) {
+        return function_exists('get_field')
+            ? get_field( $key, $supplier_id )
+            : get_post_meta( $supplier_id, $key, true );
+    }
+}
+
+$bm_registration_shortcodes = [
+    'bm_status_vat'            => 'vat_status_dostawca',
+    'bm_nazwa_firmy'           => 'nazwa_dostawca',
+    'bm_nip_firmy'             => 'nip_dostawca',
+    'bm_regon_firmy'           => 'regon_dostawca',
+    'bm_krs_firmy'             => 'krs_dostawca',
+    'bm_forma_prawna'          => 'forma_prawna_dostawca',
+    'bm_ulica_firmy'           => 'ulica_dostawca',
+    'bm_kod_pocztowy_firmy'    => 'kod_pocztowy_dostawca',
+    'bm_miejscowosc_firmy'     => 'miejscowosc_dostawca',
+    'bm_www_firmy'             => 'www_dostawca',
+    'bm_slogan_firmy'          => 'slogan_dostawca',
+    'bm_realizujemy_na_cito'   => 'bm_cito_now',
+    'bm_opis_firmy'            => 'opis_dostawca',
+    'bm_wielkosc_firmy'        => 'wielkosc_firmy_dostawca',
+    'bm_opiekun_nazwa'         => 'opiekun_imie_nazwisko',
+    'bm_opiekun_stanowisko'    => 'opiekun_stanowisko',
+    'bm_opiekun_email'         => 'opiekun_email',
+    'bm_opiekun_telefon'       => 'opiekun_telefon',
+    'bm_nagradzani_opis'       => 'nagradzani_opis',
+];
+
+foreach ( $bm_registration_shortcodes as $shortcode => $meta_key ) {
+    add_shortcode( $shortcode, function() use ( $meta_key ) {
+        $supplier_id = bm_get_current_supplier_post_id();
+        if ( ! $supplier_id ) return '';
+
+        $value = bm_get_supplier_field_value( $supplier_id, $meta_key );
+        if ( empty( $value ) ) return '';
+
+        if ( $meta_key === 'opis_dostawca' || $meta_key === 'nagradzani_opis' ) {
+            return wp_kses_post( wpautop( (string) $value ) );
+        }
+
+        if ( $meta_key === 'bm_cito_now' ) {
+            return ((int) $value === 1) ? 'Tak' : 'Nie';
+        }
+
+        return esc_html( is_scalar( $value ) ? (string) $value : '' );
+    } );
+}
+
+add_shortcode( 'bm_specjalizacje', function( $atts ) {
+    $atts = shortcode_atts(['sep' => ', '], $atts );
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_kategoria', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( implode( $atts['sep'], $terms ) );
+} );
+
+add_shortcode( 'bm_branze', function( $atts ) {
+    $atts = shortcode_atts(['sep' => ', '], $atts );
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_branza', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( implode( $atts['sep'], $terms ) );
+} );
+
+add_shortcode( 'bm_lokalizacje', function( $atts ) {
+    $atts = shortcode_atts(['sep' => ', '], $atts );
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_lokalizacja', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( implode( $atts['sep'], $terms ) );
+} );
+
+add_shortcode( 'bm_termin_realizacji', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_termin', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( $terms[0] );
+} );
+
+add_shortcode( 'bm_budzet', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $terms = wp_get_post_terms( $supplier_id, 'dostawca_budzet', ['fields' => 'names'] );
+    if ( is_wp_error($terms) || empty($terms) ) return '';
+    return esc_html( $terms[0] );
+} );
+
+add_shortcode( 'bm_konto_typ', function() {
+    if ( ! is_user_logged_in() || ! function_exists('bm_get_account_plan_data') ) return '';
+    $plan = bm_get_account_plan_data( get_current_user_id() );
+    return esc_html( $plan['label'] );
+} );
+
+add_shortcode( 'bm_dane_wykonawcy_status', function() {
+    if ( ! function_exists('bm_get_or_create_supplier_post') ) return '';
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $status = get_post_status($supplier_id);
+    $map = [
+        'draft'    => 'Robocze',
+        'pending'  => 'Oczekujące',
+        'publish'  => 'Zaakceptowane',
+        'rejected' => 'Do poprawy',
+    ];
+    return esc_html( $map[$status] ?? $status );
+} );
+
+add_shortcode( 'bm_dane_wykonawcy_adres', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $street = get_post_meta($supplier_id, 'ulica_dostawca', true);
+    $code   = get_post_meta($supplier_id, 'kod_pocztowy_dostawca', true);
+    $city   = get_post_meta($supplier_id, 'miejscowosc_dostawca', true);
+    $addr = trim($street.' '.$code.' '.$city);
+    return esc_html($addr);
+} );
+
+add_shortcode( 'bm_sekcja_dane_wykonawcy', function() {
+    $supplier_id = bm_get_current_supplier_post_id();
+    if ( ! $supplier_id ) return '';
+    $status = do_shortcode('[bm_dane_wykonawcy_status]');
+    $addr = do_shortcode('[bm_dane_wykonawcy_adres]');
+    $plan = do_shortcode('[bm_konto_typ]');
+    return '<div class="bm-box bm-box--account"><h3 class="bm-account-title">Dane Wykonawcy</h3><p><strong>Plan:</strong> '.esc_html($plan).'</p><p><strong>Status:</strong> '.esc_html($status).'</p><p><strong>Adres:</strong> '.esc_html($addr).'</p></div>';
+} );
+
+
+add_shortcode( 'bm_logo_firmy', function() {
+    return do_shortcode('[dostawca_obrazek klucz="logo_dostawca" size="medium"]');
+} );
+
+add_shortcode( 'bm_zdjecie_firmy', function() {
+    return do_shortcode('[dostawca_obrazek klucz="zdjecie_firmy" size="medium"]');
+} );
+
 /* ==========================================================
    3️⃣ SHORTCODE: [dostawca_obrazek]
    ========================================================== */

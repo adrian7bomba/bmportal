@@ -106,13 +106,15 @@
 .bm-premium-note{
   margin-top:8px;
   font-size:13px;
-  color:#1B2A4E;
-}
-.bm-premium-note--green{
-  background:#e8f8e2;
-  border:1px solid #9ADB39;
+  color:#fff;
+  background:#47c0c7;
+  border:1px solid #47c0c7;
   border-radius:12px;
   padding:10px 12px;
+}
+.bm-premium-note--green{
+  background:#47c0c7;
+  border-color:#47c0c7;
 }
 
 .bm-tax-tree{
@@ -631,8 +633,8 @@ a.bm-portfolio-toggle {
 }
 
 .bm-premium-note{
-  background:#9ADB39;
-  color:#0E275E;
+  background:#47c0c7;
+  color:#fff;
   padding:12px 14px;
   border-radius:12px;
   font-weight:600;
@@ -709,4 +711,203 @@ a.bm-portfolio-toggle {
 }
 .bm-supplier-author-header__rating{
   margin-top:8px;
+}
+
+:root{
+  --bm-brand-red:#EE2356;
+  --bm-brand-black:#1d1b1c;
+  --bm-brand-blue:#47c0c7;
+  --bm-brand-gray:#e8e9eb;
+  --bm-brand-navy:#282a36;
+  --bm-brand-darkgray:#44474e;
+}
+
+.bm-box--account,
+.bm-form{ border-color: var(--bm-brand-gray); }
+.bm-account-title,
+.bm-form__h{ color:var(--bm-brand-navy); }
+
+.bm-field input[type=text],
+.bm-field input[type=email],
+.bm-field input[type=url],
+.bm-field input[type=tel],
+.bm-field input[type=number],
+.bm-field select,
+.bm-field textarea{ border-color:var(--bm-brand-gray); color:var(--bm-brand-black); }
+
+.bm-field input:focus,
+.bm-field select:focus,
+.bm-field textarea:focus{
+  border-color:var(--bm-brand-blue);
+  box-shadow:0 0 0 3px rgba(71,192,199,.2);
+}
+
+.bm-btn,
+.woocommerce .button,
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce input.button,
+.bm-btn-submit,
+.woocommerce .button.bm-btn-submit,
+.bm-btn-nip-fetch,
+button.button,
+a.button{
+  background:var(--bm-brand-red) !important;
+  border-color:var(--bm-brand-red) !important;
+  color:#fff !important;
+}
+
+.bm-btn-nip-fetch{ white-space:nowrap; }
+.bm-nip-inline{ display:flex; gap:8px; align-items:center; }
+
+.bm-tax-tree__parent{ color:var(--bm-brand-darkgray); font-weight:700; }
+.bm-tax-tree__checkbox[disabled]{ opacity:.45; cursor:not-allowed; }
+
+.bm-photo-preview{
+  margin-top:10px;
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  border:2px dashed var(--bm-brand-gray);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--bm-brand-darkgray);
+  background:#fff;
+  background-size:cover;
+  background-position:center;
+}
+.bm-photo-preview.is-filled span{ display:none; }
+
+.bm-reject-reason{ border-left:4px solid var(--bm-brand-red); }
+
+
+.bm-btn:hover,
+.woocommerce .button:hover,
+.woocommerce a.button:hover,
+.woocommerce button.button:hover,
+.woocommerce input.button:hover,
+.bm-btn-nip-fetch:hover,
+.bm-btn-submit:hover,
+button.button:hover,
+a.button:hover{
+  background:var(--bm-brand-black) !important;
+  border-color:var(--bm-brand-black) !important;
+}
+
+.bm-help--file-error{ color:#b42318; font-weight:600; margin-top:6px; }
+
+.bm-premium-link{
+  text-decoration: underline !important;
+  font-weight:700;
+  color:#fff !important;
+}
+
+.bm-account-plan-note{
+  background:#282a36;
+  color:#fff;
+  border-radius:10px;
+  padding:10px 12px;
+  margin:0 0 12px;
+}
+
+.bm-form--supplier .bm-form__section{ margin-bottom:20px; }
+.bm-form--supplier .bm-grid{ gap:12px; margin-bottom:12px; }
+.bm-form--supplier .bm-field{ margin-bottom:8px; }
+.bm-form--supplier .bm-field label{ display:block; margin-bottom:6px; }
+.bm-form--supplier .bm-field .bm-help{ margin-top:6px; }
+.bm-form--supplier .bm-form__actions{ margin-top:14px; }
+
+.bm-form--supplier-cito{
+  margin-bottom:12px;
+}
+
+.bm-form--offer .bm-offers-listing{
+  list-style:none;
+  padding-left:0;
+  margin-top:16px;
+}
+
+.bm-form--offer .bm-offers-listing__item,
+.bm-offers-list .bm-offers-listing__item{
+  border-top:1px solid var(--bm-brand-gray);
+  padding:12px 0;
+}
+
+.bm-form--offer .bm-offers-listing__actions,
+.bm-offers-list .bm-offers-listing__actions{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Wiadomości – styl marki */
+.bm-message-form textarea{
+  border:1px solid var(--bm-brand-gray) !important;
+  border-radius:10px;
+}
+
+.bm-message-form button,
+.bm-message-form .button,
+.bm-message-form .button-primary{
+  background:var(--bm-brand-red) !important;
+  border-color:var(--bm-brand-red) !important;
+  color:#fff !important;
+}
+
+.bm-message-form button:hover,
+.bm-message-form .button:hover,
+.bm-message-form .button-primary:hover{
+  background:var(--bm-brand-black) !important;
+  border-color:var(--bm-brand-black) !important;
+}
+
+/* Klient (ACF form) – wizualnie jak formularz Dostawcy */
+.bm-form--client .acf-fields{ border:0 !important; }
+.bm-form--client .acf-field{ padding:10px 0 !important; border-top:0 !important; }
+.bm-form--client .acf-label label{ font-weight:600; margin-bottom:6px !important; }
+
+.bm-form--client .acf-input input[type="text"],
+.bm-form--client .acf-input input[type="email"],
+.bm-form--client .acf-input input[type="url"],
+.bm-form--client .acf-input input[type="tel"],
+.bm-form--client .acf-input input[type="number"],
+.bm-form--client .acf-input select,
+.bm-form--client .acf-input textarea{
+  border:1px solid var(--bm-brand-gray) !important;
+  border-radius:10px !important;
+  padding:10px 12px !important;
+  color:var(--bm-brand-black) !important;
+}
+
+.bm-form--client .acf-input input:focus,
+.bm-form--client .acf-input select:focus,
+.bm-form--client .acf-input textarea:focus{
+  border-color:var(--bm-brand-blue) !important;
+  box-shadow:0 0 0 3px rgba(71,192,199,.2) !important;
+}
+
+.bm-form--client .acf-form-submit{
+  margin-top:14px;
+}
+
+/* Utwardzenie stylu przycisku "Pobierz dane" (nadpisywanie styli motywu/Woo) */
+.bm-nip-inline .button.bm-btn-nip-fetch,
+.woocommerce .bm-nip-inline .button.bm-btn-nip-fetch,
+.woocommerce-page .bm-nip-inline .button.bm-btn-nip-fetch{
+  background: #EE2356 !important;
+  border-color: #EE2356 !important;
+  color: #fff !important;
+}
+
+.bm-nip-inline .button.bm-btn-nip-fetch:hover,
+.bm-nip-inline .button.bm-btn-nip-fetch:focus,
+.woocommerce .bm-nip-inline .button.bm-btn-nip-fetch:hover,
+.woocommerce .bm-nip-inline .button.bm-btn-nip-fetch:focus,
+.woocommerce-page .bm-nip-inline .button.bm-btn-nip-fetch:hover,
+.woocommerce-page .bm-nip-inline .button.bm-btn-nip-fetch:focus{
+  background: #1d1b1c !important;
+  border-color: #1d1b1c !important;
+  color: #fff !important;
 }

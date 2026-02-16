@@ -15,15 +15,8 @@ add_action('admin_menu', function(){
         26
     );
 
-    add_submenu_page('bm-brandmanager', 'Dostawcy', 'Dostawcy', 'edit_posts', 'edit.php?post_type=dostawca');
-    // Submenu dla `dostawca_oferta` dodaje się automatycznie przez CPT -> show_in_menu,
-    // więc nie dodajemy ręcznie, żeby uniknąć duplikatu pozycji.
-    add_submenu_page('bm-brandmanager', 'Zamawiający', 'Zamawiający', 'edit_posts', 'edit.php?post_type=zamawiajacy');
-    add_submenu_page('bm-brandmanager', 'Ogłoszenia', 'Ogłoszenia', 'edit_posts', 'edit.php?post_type=ogloszenie');
-    add_submenu_page('bm-brandmanager', 'Współprace', 'Współprace', 'edit_posts', 'edit.php?post_type=bm_deal');
-    add_submenu_page('bm-brandmanager', 'Opinie', 'Opinie', 'edit_posts', 'edit.php?post_type=bm_review');
-    add_submenu_page('bm-brandmanager', 'Portfolio', 'Portfolio', 'edit_posts', 'edit.php?post_type=bm_portfolio');
-    add_submenu_page('bm-brandmanager', 'Wiadomości', 'Wiadomości', 'edit_posts', 'edit.php?post_type=bm_thread');
+    // CPTy są podpinane automatycznie przez show_in_menu => bm-brandmanager,
+    // dlatego tutaj dodajemy tylko dodatkowe narzędzia/słowniki.
 
     // Słowniki do konfiguracji stawek/terminów (taksonomie)
     add_submenu_page('bm-brandmanager', 'Stawki (Budżety)', 'Stawki (Budżety)', 'manage_categories', 'edit-tags.php?taxonomy=dostawca_budzet&post_type=dostawca');

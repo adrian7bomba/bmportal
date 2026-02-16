@@ -30,13 +30,12 @@ add_action( 'plugins_loaded', function() {
     require_once BM_PORTAL_PATH . 'includes/portal-ogloszenia.php';
     require_once BM_PORTAL_PATH . 'includes/messages.php';
     require_once BM_PORTAL_PATH . 'includes/messages-buttons.php';
+    require_once BM_PORTAL_PATH . 'includes/admin-brandmanager-menu.php';
     require_once BM_PORTAL_PATH . 'includes/deals.php';
     require_once BM_PORTAL_PATH . 'includes/reviews.php';
     require_once BM_PORTAL_PATH . 'includes/portfolio.php';
     require_once BM_PORTAL_PATH . 'includes/supplier-posts.php';
-    require_once BM_PORTAL_PATH . 'includes/bm_brandmanager_form_test.php';
-require_once BM_PORTAL_PATH . 'includes/supplier-posts.php';
-require_once BM_PORTAL_PATH . 'includes/bm-nip-test-shortcode.php';
+    require_once BM_PORTAL_PATH . 'includes/company-registry.php';
 
 
 });

@@ -67,10 +67,12 @@ add_action('init', function(){
     ]);
 }, 9);
 
-/* Powiązanie istniejących taksonomii z ofertą (gdy są zarejestrowane) */
+/*
+ * Oferty mają dedykowane taksonomie `oferta_*`,
+ * ale kategoria oferty korzysta także z tych samych terminów co Dane Dostawcy.
+ */
 add_action('init', function(){
-    if (taxonomy_exists('dostawca_kategoria'))   register_taxonomy_for_object_type('dostawca_kategoria','dostawca_oferta');
-    if (taxonomy_exists('dostawca_lokalizacja')) register_taxonomy_for_object_type('dostawca_lokalizacja','dostawca_oferta');
-    if (taxonomy_exists('dostawca_termin'))      register_taxonomy_for_object_type('dostawca_termin','dostawca_oferta');
-    if (taxonomy_exists('dostawca_budzet'))      register_taxonomy_for_object_type('dostawca_budzet','dostawca_oferta');
+    if (taxonomy_exists('dostawca_kategoria')) {
+        register_taxonomy_for_object_type('dostawca_kategoria', 'dostawca_oferta');
+    }
 }, 20);

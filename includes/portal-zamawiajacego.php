@@ -53,8 +53,8 @@ add_action( 'woocommerce_account_client-data_endpoint', function() {
     $post_id = bm_get_or_create_client_post( $user->ID );
     $status  = get_post_status( $post_id );
 
-    echo '<div style="background:#fff;padding:16px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:20px;">';
-    echo '<h2 style="margin-top:0;">Dane Klienta</h2>';
+    echo '<div class="bm-box bm-box--account bm-client-box">';
+    echo '<h2 class="bm-account-title">Dane Klienta</h2>';
 
     if ( 'publish' === $status ) {
         echo '<p>Status: <strong>Aktywne</strong> – Twoja wizytówka jest widoczna publicznie.</p>';
@@ -78,7 +78,8 @@ add_action( 'woocommerce_account_client-data_endpoint', function() {
         'submit_value'     => 'Zapisz dane',
         'updated_message'  => 'Dane Klienta zapisane.',
         'label_placement'  => 'top',
-        'html_after_fields'=> '<input type="hidden" name="bm_client_form" value="1" />',
+        'html_before_fields'=> '<div class="bm-form bm-form--client">',
+        'html_after_fields'=> '<input type="hidden" name="bm_client_form" value="1" /></div>',
     ] );
 } );
 

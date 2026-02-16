@@ -67,4 +67,12 @@ add_action('init', function(){
     ]);
 }, 9);
 
-/* Oferty mają dedykowane taksonomie `oferta_*` definiowane w taksonomie-dostawca.php */
+/*
+ * Oferty mają dedykowane taksonomie `oferta_*`,
+ * ale kategoria oferty korzysta także z tych samych terminów co Dane Dostawcy.
+ */
+add_action('init', function(){
+    if (taxonomy_exists('dostawca_kategoria')) {
+        register_taxonomy_for_object_type('dostawca_kategoria', 'dostawca_oferta');
+    }
+}, 20);

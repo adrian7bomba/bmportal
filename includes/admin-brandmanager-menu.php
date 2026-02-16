@@ -18,8 +18,11 @@ add_action('admin_menu', function(){
     // CPTy są podpinane automatycznie przez show_in_menu => bm-brandmanager,
     // dlatego tutaj dodajemy tylko dodatkowe narzędzia/słowniki.
 
+    // Słowniki DOSTAWCÓW
+    add_submenu_page('bm-brandmanager', 'Specjalizacje Dostawców', 'Specjalizacje Dostawców', 'manage_categories', 'edit-tags.php?taxonomy=dostawca_kategoria&post_type=dostawca');
+    add_submenu_page('bm-brandmanager', 'Branże Dostawców', 'Branże Dostawców', 'manage_categories', 'edit-tags.php?taxonomy=dostawca_branza&post_type=dostawca');
+
     // Słowniki OFERT
-    add_submenu_page('bm-brandmanager', 'Kategorie Ofert', 'Kategorie Ofert', 'manage_categories', 'edit-tags.php?taxonomy=oferta_kategoria&post_type=dostawca_oferta');
     add_submenu_page('bm-brandmanager', 'Specjalizacje Ofert', 'Specjalizacje Ofert', 'manage_categories', 'edit-tags.php?taxonomy=oferta_specjalizacja&post_type=dostawca_oferta');
     add_submenu_page('bm-brandmanager', 'Stawki Ofert', 'Stawki Ofert', 'manage_categories', 'edit-tags.php?taxonomy=oferta_budzet&post_type=dostawca_oferta');
     add_submenu_page('bm-brandmanager', 'Terminy Ofert', 'Terminy Ofert', 'manage_categories', 'edit-tags.php?taxonomy=oferta_termin&post_type=dostawca_oferta');

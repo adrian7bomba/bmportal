@@ -16,13 +16,18 @@ add_action('admin_menu', function(){
     );
 
     add_submenu_page('bm-brandmanager', 'Dostawcy', 'Dostawcy', 'edit_posts', 'edit.php?post_type=dostawca');
-    add_submenu_page('bm-brandmanager', 'Oferty Dostawców', 'Oferty Dostawców', 'edit_posts', 'edit.php?post_type=dostawca_oferta');
+    // Submenu dla `dostawca_oferta` dodaje się automatycznie przez CPT -> show_in_menu,
+    // więc nie dodajemy ręcznie, żeby uniknąć duplikatu pozycji.
     add_submenu_page('bm-brandmanager', 'Zamawiający', 'Zamawiający', 'edit_posts', 'edit.php?post_type=zamawiajacy');
     add_submenu_page('bm-brandmanager', 'Ogłoszenia', 'Ogłoszenia', 'edit_posts', 'edit.php?post_type=ogloszenie');
     add_submenu_page('bm-brandmanager', 'Współprace', 'Współprace', 'edit_posts', 'edit.php?post_type=bm_deal');
     add_submenu_page('bm-brandmanager', 'Opinie', 'Opinie', 'edit_posts', 'edit.php?post_type=bm_review');
     add_submenu_page('bm-brandmanager', 'Portfolio', 'Portfolio', 'edit_posts', 'edit.php?post_type=bm_portfolio');
     add_submenu_page('bm-brandmanager', 'Wiadomości', 'Wiadomości', 'edit_posts', 'edit.php?post_type=bm_thread');
+
+    // Słowniki do konfiguracji stawek/terminów (taksonomie)
+    add_submenu_page('bm-brandmanager', 'Stawki (Budżety)', 'Stawki (Budżety)', 'manage_categories', 'edit-tags.php?taxonomy=dostawca_budzet&post_type=dostawca');
+    add_submenu_page('bm-brandmanager', 'Terminy realizacji', 'Terminy realizacji', 'manage_categories', 'edit-tags.php?taxonomy=dostawca_termin&post_type=dostawca');
 }, 20);
 
 function bm_brandmanager_admin_dashboard(){

@@ -1071,6 +1071,13 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
     }
 
     $offer_limit = 3;
+    $is_premium = bm_user_has_premium($user->ID);
+    $offer_limit_effective = $is_premium ? 6 : $offer_limit;
+    $offer_upgrade_link = '<a href="https://brandmanager.cfolks.pl/premium/" class="bm-premium-link" target="_blank" rel="noopener">Ulepsz</a> ->';
+
+    $offer_limit_note = $is_premium
+        ? 'Korzystasz z Premium, możesz dodać aż o 3 oferty więcej niż konto standardowe.'
+        : 'W planie darmowym możesz dodać maksymalnie <strong>3</strong> oferty. '.$offer_upgrade_link;
 
     $offers = get_posts([
         'post_type'   => 'dostawca_oferta',
@@ -1091,25 +1098,27 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
         $edit_id = (int) $_GET['edit_offer'];
     }
 
-    echo '<div style="background:#fff;padding:16px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:20px;">';
-    echo '<h2 style="margin-top:0;">Twoje oferty</h2>';
-    echo '<p>W planie darmowym możesz dodać maksymalnie <strong>'.$offer_limit.'</strong> ofert(y). 
-          Obecnie masz: <strong>'.$offers_count.'</strong>.</p>';
-    echo '<p><button type="button" class="button" style="margin-top:8px;">Zwiększ limit (wkrótce)</button></p>';
+    echo '<div class="bm-box bm-box--account">';
+    echo '<h2 class="bm-account-title">Twoje oferty</h2>';
+    echo '<div class="bm-premium-note">'.wp_kses_post($offer_limit_note).'</div>';
+    echo '<p>Obecnie masz: <strong>'.$offers_count.'</strong> / <strong>'.$offer_limit_effective.'</strong>.</p>';
+    echo '<p><a href="https://brandmanager.cfolks.pl/premium/" class="button bm-btn-submit">Zwiększ limit</a></p>';
     echo '</div>';
 
     if ($mode === 'new'){
 
-        if ($offers_count >= $offer_limit){
-            echo '<div style="background:#fffbe6;padding:12px;border-radius:6px;border:1px solid #faad14;margin-bottom:24px;">
-                    Osiągnąłeś limit '.$offer_limit.' ofert w planie darmowym.
-                  </div>';
+        if ($offers_count >= $offer_limit_effective){
+            echo '<div class="bm-alert bm-alert--error">Osiągnąłeś limit '.$offer_limit_effective.' ofert dla aktualnego planu.</div>';
             echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Wróć do listy ofert</a></p>';
             return;
         }
 
-        echo '<div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:24px;">';
-        echo '<h3 style="margin-top:0;">Dodaj nową ofertę</h3>';
+        echo '<div class="bm-form bm-form--supplier bm-form--offer">';
+        echo '<h3 class="bm-form__h">Dodaj nową ofertę</h3>';
+        echo '<div class="bm-help">Kategoria oraz obrazek oferty mają te same zasady jakości jak w Danych Wykonawcy (czytelna grafika, poprawne kategorie, limity planu).</div>';
+        echo '<div class="bm-field bm-field--offer-cats"><label>Kategoria oferty (max '.(int)$max_taxonomy_items.')</label>';
+        bm_render_tax_tree('dostawca_kategoria','bm_offer_categories',[],$max_taxonomy_items);
+        echo '</div>';
 
         acf_form([
             'post_id'          => 'new_post',
@@ -1125,10 +1134,11 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
             'submit_value'     => 'Zapisz ofertę',
             'updated_message'  => 'Oferta została zapisana.',
             'label_placement'  => 'top',
-            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" />',
+            'html_before_fields'=> '<div class="bm-offer-form-acf">',
+            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" /></div>',
         ]);
 
-        echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'" style="margin-top:10px;">Anuluj</a></p>';
+        echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Anuluj</a></p>';
         echo '</div>';
 
         return;
@@ -1138,15 +1148,19 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
 
         $offer = get_post($edit_id);
         if (!$offer || $offer->post_type !== 'dostawca_oferta' || (int)$offer->post_author !== $user->ID){
-            echo '<div style="background:#fff1f0;padding:12px;border-radius:6px;border:1px solid #f5222d;margin-bottom:12px;">
-                    Nie możesz edytować tej oferty.
-                  </div>';
+            echo '<div class="bm-alert bm-alert--error">Nie możesz edytować tej oferty.</div>';
             echo '<p><a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">Wróć do listy ofert</a></p>';
             return;
         }
 
-        echo '<div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:24px;">';
-        echo '<h3 style="margin-top:0;">Edytuj ofertę: '.esc_html(get_the_title($offer)).'</h3>';
+        echo '<div class="bm-form bm-form--supplier bm-form--offer">';
+        echo '<h3 class="bm-form__h">Edytuj ofertę: '.esc_html(get_the_title($offer)).'</h3>';
+        echo '<div class="bm-help">Kategoria oraz obrazek oferty mają te same zasady jakości jak w Danych Wykonawcy.</div>';
+        $offer_selected_cats = wp_get_post_terms($offer->ID, 'dostawca_kategoria', ['fields' => 'ids']);
+        if (is_wp_error($offer_selected_cats)) { $offer_selected_cats = []; }
+        echo '<div class="bm-field bm-field--offer-cats"><label>Kategoria oferty (max '.(int)$max_taxonomy_items.')</label>';
+        bm_render_tax_tree('dostawca_kategoria','bm_offer_categories',$offer_selected_cats,$max_taxonomy_items);
+        echo '</div>';
 
         $delete_url = wp_nonce_url(
             add_query_arg('delete_supplier_offer', $edit_id, wc_get_account_endpoint_url('supplier-offers')),
@@ -1162,17 +1176,17 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
             'submit_value'     => 'Zapisz zmiany',
             'updated_message'  => 'Oferta została zaktualizowana.',
             'label_placement'  => 'top',
-            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" />',
+            'html_before_fields'=> '<div class="bm-offer-form-acf">',
+            'html_after_fields'=> '<input type="hidden" name="bm_offer_form" value="1" /></div>',
         ]);
 
-        echo '<p style="margin-top:20px;">
+        echo '<p>
                 <a href="'.esc_url($delete_url).'"
                    class="button"
-                   style="background:#c62828;color:#fff;border-color:#b71c1c;"
                    onclick="return confirm(\'Czy na pewno usunąć tę ofertę?\');">
                     Usuń ofertę
                 </a>
-                <a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'" style="margin-left:8px;">
+                <a class="button" href="'.esc_url(wc_get_account_endpoint_url('supplier-offers')).'">
                     Wróć do listy ofert
                 </a>
               </p>';
@@ -1182,27 +1196,27 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
         return;
     }
 
-    echo '<div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #e8e8e8;">';
-    echo '<h3 style="margin-top:0;">Lista Twoich ofert</h3>';
+    echo '<div class="bm-box bm-box--account bm-offers-list">';
+    echo '<h3 class="bm-form__h">Lista Twoich ofert</h3>';
 
-    if ($offers_count < $offer_limit){
+    if ($offers_count < $offer_limit_effective){
         $new_url = add_query_arg('new_offer', 1, wc_get_account_endpoint_url('supplier-offers'));
         echo '<p><a class="button button-primary" href="'.esc_url($new_url).'">Dodaj nową ofertę</a></p>';
     } else {
-        echo '<p><strong>Masz już maksymalną liczbę ofert w planie darmowym.</strong></p>';
+        echo '<div class="bm-premium-note">Masz już maksymalną liczbę ofert dla aktualnego planu. '.wp_kses_post($offer_upgrade_link).'</div>';
     }
 
     if (empty($offers)){
         echo '<p>Nie masz jeszcze żadnych ofert.</p>';
     } else {
-        echo '<ul style="list-style:none;padding-left:0;margin-top:20px;">';
+        echo '<ul class="bm-offers-listing">';
         foreach($offers as $offer){
             $edit_link = add_query_arg('edit_offer', $offer->ID, wc_get_account_endpoint_url('supplier-offers'));
             $view_link = get_permalink($offer->ID);
 
-            echo '<li style="border-top:1px solid #e8e8e8;padding:12px 0;">';
+            echo '<li class="bm-offers-listing__item">';
             echo '<strong>'.esc_html(get_the_title($offer)).'</strong>';
-            echo '<div style="margin-top:6px;">';
+            echo '<div class="bm-offers-listing__actions">';
             echo '<a class="button" href="'.esc_url($edit_link).'">Edytuj</a> ';
             if ($view_link){
                 echo '<a class="button" href="'.esc_url($view_link).'" target="_blank">Zobacz</a>';
@@ -1214,4 +1228,46 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
     }
 
     echo '</div>';
+
+    echo '<script>(function(){
+      var offerForm = document.querySelector(".bm-form--offer form, .bm-form--offer");
+      if(!offerForm) return;
+
+      var fileInputs = offerForm.querySelectorAll("input[type=file]");
+      fileInputs.forEach(function(inp){
+        inp.addEventListener("change", function(){
+          var f = this.files && this.files[0] ? this.files[0] : null;
+          if(!f) return;
+          if(f.size > 262144){
+            alert("Plik jest za duży. Maksymalny rozmiar: 256KB.");
+            this.value = "";
+          }
+        });
+      });
+    })();</script>';
 });
+
+add_action('acf/save_post', function($post_id){
+    if (empty($_POST['bm_offer_form'])) return;
+    if (get_post_type($post_id) !== 'dostawca_oferta') return;
+    if (!is_user_logged_in()) return;
+
+    $user = wp_get_current_user();
+    if (!in_array('dostawca', (array) $user->roles, true)) return;
+
+    // Oferta zawsze przypisana do aktualnego wykonawcy
+    $supplier_post_id = bm_get_or_create_supplier_post($user->ID);
+    update_post_meta($post_id, 'powiazany_dostawca', (int) $supplier_post_id);
+    wp_update_post(['ID' => $post_id, 'post_author' => $user->ID]);
+
+    // Kategorie oferty z taką samą logiką limitu jak w danych wykonawcy
+    $max_taxonomy_items = bm_user_has_premium($user->ID) ? 6 : 3;
+    $offer_cats = isset($_POST['bm_offer_categories']) ? array_map('intval', (array) wp_unslash($_POST['bm_offer_categories'])) : [];
+    $offer_cats = array_values(array_filter($offer_cats));
+    if (count($offer_cats) > $max_taxonomy_items) {
+        $offer_cats = array_slice($offer_cats, 0, $max_taxonomy_items);
+    }
+    if (!empty($offer_cats)){
+        wp_set_object_terms($post_id, $offer_cats, 'dostawca_kategoria', false);
+    }
+}, 30);

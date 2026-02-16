@@ -822,6 +822,47 @@ a.button:hover{
   margin-bottom:12px;
 }
 
+.bm-form--offer .bm-offers-listing{
+  list-style:none;
+  padding-left:0;
+  margin-top:16px;
+}
+
+.bm-form--offer .bm-offers-listing__item,
+.bm-offers-list .bm-offers-listing__item{
+  border-top:1px solid var(--bm-brand-gray);
+  padding:12px 0;
+}
+
+.bm-form--offer .bm-offers-listing__actions,
+.bm-offers-list .bm-offers-listing__actions{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Wiadomości – styl marki */
+.bm-message-form textarea{
+  border:1px solid var(--bm-brand-gray) !important;
+  border-radius:10px;
+}
+
+.bm-message-form button,
+.bm-message-form .button,
+.bm-message-form .button-primary{
+  background:var(--bm-brand-red) !important;
+  border-color:var(--bm-brand-red) !important;
+  color:#fff !important;
+}
+
+.bm-message-form button:hover,
+.bm-message-form .button:hover,
+.bm-message-form .button-primary:hover{
+  background:var(--bm-brand-black) !important;
+  border-color:var(--bm-brand-black) !important;
+}
+
 /* Klient (ACF form) – wizualnie jak formularz Dostawcy */
 .bm-form--client .acf-fields{ border:0 !important; }
 .bm-form--client .acf-field{ padding:10px 0 !important; border-top:0 !important; }

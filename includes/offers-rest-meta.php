@@ -10,7 +10,7 @@ add_action('init', function() {
     $fields = [
         'oferta_stawka',
         'oferta_tryb',
-        'oferta_miasto',
+        'oferta_obszar',
         'oferta_termin',
         'oferta_kategoria',
         'oferta_budzet',

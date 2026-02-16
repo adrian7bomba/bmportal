@@ -1116,20 +1116,23 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
 
         echo '<div class="bm-form bm-form--supplier bm-form--offer">';
         echo '<h3 class="bm-form__h">Dodaj nową ofertę</h3>';
-        echo '<div class="bm-help">Kategoria oraz obrazek oferty mają te same zasady jakości jak w Danych Wykonawcy (czytelna grafika, poprawne kategorie, limity planu).</div>';
         echo '<div class="bm-field bm-field--offer-cats"><label>Kategoria oferty (max '.(int)$offer_cat_limit.')</label>';
-        bm_render_tax_tree('dostawca_kategoria','bm_offer_categories',[],$offer_cat_limit);
+        bm_render_tax_tree('oferta_kategoria','bm_offer_categories',[],$offer_cat_limit);
+        echo '</div>';
+        echo '<div class="bm-field bm-field--offer-spec"><label>Specjalizacja oferty (max '.(int)$offer_cat_limit.')</label>';
+        bm_render_tax_tree('oferta_specjalizacja','bm_offer_specializations',[],$offer_cat_limit);
         echo '</div>';
         echo '<div class="bm-field bm-field--offer-term"><label>Termin realizacji</label>';
-        $offer_term_options = get_terms(['taxonomy' => 'dostawca_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        $offer_term_options = get_terms(['taxonomy' => 'oferta_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
         echo '<select name="bm_offer_term"><option value="0">— wybierz —</option>';
         if (!is_wp_error($offer_term_options)){ foreach($offer_term_options as $term_opt){ echo '<option value="'.esc_attr((int)$term_opt->term_id).'">'.esc_html($term_opt->name).'</option>'; } }
         echo '</select></div>';
         echo '<div class="bm-field bm-field--offer-budget"><label>Stawka / Budżet</label>';
-        $offer_budget_options = get_terms(['taxonomy' => 'dostawca_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        $offer_budget_options = get_terms(['taxonomy' => 'oferta_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
         echo '<select name="bm_offer_budget"><option value="0">— wybierz —</option>';
         if (!is_wp_error($offer_budget_options)){ foreach($offer_budget_options as $budget_opt){ echo '<option value="'.esc_attr((int)$budget_opt->term_id).'">'.esc_html($budget_opt->name).'</option>'; } }
         echo '</select></div>';
+        echo '<div class="bm-field bm-field--offer-image-note"><div class="bm-help">Obrazek oferty: maks. 256KB. Po wyborze zobaczysz podgląd kołowy.</div><div class="bm-photo-preview bm-offer-photo-preview"><span>Podgląd obrazka w kole</span></div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
         echo '</div>';
 
         acf_form([
@@ -1167,26 +1170,31 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
 
         echo '<div class="bm-form bm-form--supplier bm-form--offer">';
         echo '<h3 class="bm-form__h">Edytuj ofertę: '.esc_html(get_the_title($offer)).'</h3>';
-        echo '<div class="bm-help">Kategoria oraz obrazek oferty mają te same zasady jakości jak w Danych Wykonawcy.</div>';
-        $offer_selected_cats = wp_get_post_terms($offer->ID, 'dostawca_kategoria', ['fields' => 'ids']);
+        $offer_selected_cats = wp_get_post_terms($offer->ID, 'oferta_kategoria', ['fields' => 'ids']);
         if (is_wp_error($offer_selected_cats)) { $offer_selected_cats = []; }
+        $offer_selected_specs = wp_get_post_terms($offer->ID, 'oferta_specjalizacja', ['fields' => 'ids']);
+        if (is_wp_error($offer_selected_specs)) { $offer_selected_specs = []; }
         echo '<div class="bm-field bm-field--offer-cats"><label>Kategoria oferty (max '.(int)$offer_cat_limit.')</label>';
-        bm_render_tax_tree('dostawca_kategoria','bm_offer_categories',$offer_selected_cats,$offer_cat_limit);
+        bm_render_tax_tree('oferta_kategoria','bm_offer_categories',$offer_selected_cats,$offer_cat_limit);
         echo '</div>';
-        $offer_selected_term = wp_get_post_terms($offer->ID, 'dostawca_termin', ['fields' => 'ids']);
+        echo '<div class="bm-field bm-field--offer-spec"><label>Specjalizacja oferty (max '.(int)$offer_cat_limit.')</label>';
+        bm_render_tax_tree('oferta_specjalizacja','bm_offer_specializations',$offer_selected_specs,$offer_cat_limit);
+        echo '</div>';
+        $offer_selected_term = wp_get_post_terms($offer->ID, 'oferta_termin', ['fields' => 'ids']);
         if (is_wp_error($offer_selected_term) || empty($offer_selected_term)) { $offer_selected_term = [0]; }
-        $offer_selected_budget = wp_get_post_terms($offer->ID, 'dostawca_budzet', ['fields' => 'ids']);
+        $offer_selected_budget = wp_get_post_terms($offer->ID, 'oferta_budzet', ['fields' => 'ids']);
         if (is_wp_error($offer_selected_budget) || empty($offer_selected_budget)) { $offer_selected_budget = [0]; }
         echo '<div class="bm-field bm-field--offer-term"><label>Termin realizacji</label>';
-        $offer_term_options = get_terms(['taxonomy' => 'dostawca_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        $offer_term_options = get_terms(['taxonomy' => 'oferta_termin', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
         echo '<select name="bm_offer_term"><option value="0">— wybierz —</option>';
         if (!is_wp_error($offer_term_options)){ foreach($offer_term_options as $term_opt){ echo '<option value="'.esc_attr((int)$term_opt->term_id).'" '.selected((int)$offer_selected_term[0], (int)$term_opt->term_id, false).'>'.esc_html($term_opt->name).'</option>'; } }
         echo '</select></div>';
         echo '<div class="bm-field bm-field--offer-budget"><label>Stawka / Budżet</label>';
-        $offer_budget_options = get_terms(['taxonomy' => 'dostawca_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+        $offer_budget_options = get_terms(['taxonomy' => 'oferta_budzet', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
         echo '<select name="bm_offer_budget"><option value="0">— wybierz —</option>';
         if (!is_wp_error($offer_budget_options)){ foreach($offer_budget_options as $budget_opt){ echo '<option value="'.esc_attr((int)$budget_opt->term_id).'" '.selected((int)$offer_selected_budget[0], (int)$budget_opt->term_id, false).'>'.esc_html($budget_opt->name).'</option>'; } }
         echo '</select></div>';
+        echo '<div class="bm-field bm-field--offer-image-note"><div class="bm-help">Obrazek oferty: maks. 256KB. Po wyborze zobaczysz podgląd kołowy.</div><div class="bm-photo-preview bm-offer-photo-preview"><span>Podgląd obrazka w kole</span></div><div class="bm-help bm-help--file-error" aria-live="polite"></div></div>';
         echo '</div>';
 
         $delete_url = wp_nonce_url(
@@ -1257,20 +1265,59 @@ add_action('woocommerce_account_supplier-offers_endpoint', function(){
     echo '</div>';
 
     echo '<script>(function(){
-      var offerForm = document.querySelector(".bm-form--offer form, .bm-form--offer");
-      if(!offerForm) return;
+      var offerWrap = document.querySelector(".bm-form--offer");
+      if(!offerWrap) return;
 
-      var fileInputs = offerForm.querySelectorAll("input[type=file]");
-      fileInputs.forEach(function(inp){
-        inp.addEventListener("change", function(){
+      function bindOfferLimit(fieldClass, max){
+        var root = offerWrap.querySelector(fieldClass + " .bm-tax-tree");
+        if(!root) return;
+        var boxes = root.querySelectorAll("input[type=checkbox]");
+        function enforce(){
+          var checked = root.querySelectorAll("input[type=checkbox]:checked").length;
+          boxes.forEach(function(cb){
+            if(!cb.checked){
+              cb.disabled = checked >= max;
+              cb.parentElement.classList.toggle("is-disabled", checked >= max);
+            }
+          });
+        }
+        boxes.forEach(function(cb){ cb.addEventListener("change", enforce); });
+        enforce();
+      }
+
+      bindOfferLimit(".bm-field--offer-cats", 3);
+      bindOfferLimit(".bm-field--offer-spec", 3);
+
+      var preview = offerWrap.querySelector(".bm-offer-photo-preview");
+      var fileErr = offerWrap.querySelector(".bm-field--offer-image-note .bm-help--file-error");
+      var imageInput = offerWrap.querySelector("input[type=file][name^=\"acf[field_\"]");
+
+      if(imageInput){
+        imageInput.addEventListener("change", function(){
           var f = this.files && this.files[0] ? this.files[0] : null;
           if(!f) return;
+
           if(f.size > 262144){
-            alert("Plik jest za duży. Maksymalny rozmiar: 256KB.");
+            if(fileErr){ fileErr.textContent = "Plik jest za duży. Maksymalny rozmiar: 256KB."; }
             this.value = "";
+            if(preview){
+              preview.style.backgroundImage = "none";
+              preview.classList.remove("is-filled");
+            }
+            return;
+          }
+
+          if(fileErr){ fileErr.textContent = ""; }
+          if(preview){
+            var reader = new FileReader();
+            reader.onload = function(e){
+              preview.style.backgroundImage = "url(" + e.target.result + ")";
+              preview.classList.add("is-filled");
+            };
+            reader.readAsDataURL(f);
           }
         });
-      });
+      }
     })();</script>';
 });
 
@@ -1295,14 +1342,21 @@ add_action('acf/save_post', function($post_id){
         $offer_cats = array_slice($offer_cats, 0, $max_taxonomy_items);
     }
     if (!empty($offer_cats)){
-        wp_set_object_terms($post_id, $offer_cats, 'dostawca_kategoria', false);
+        wp_set_object_terms($post_id, $offer_cats, 'oferta_kategoria', false);
     } else {
-        wp_set_object_terms($post_id, [], 'dostawca_kategoria', false);
+        wp_set_object_terms($post_id, [], 'oferta_kategoria', false);
     }
 
+    $offer_specs = isset($_POST['bm_offer_specializations']) ? array_map('intval', (array) wp_unslash($_POST['bm_offer_specializations'])) : [];
+    $offer_specs = array_values(array_filter($offer_specs));
+    if (count($offer_specs) > $max_taxonomy_items) {
+        $offer_specs = array_slice($offer_specs, 0, $max_taxonomy_items);
+    }
+    wp_set_object_terms($post_id, $offer_specs, 'oferta_specjalizacja', false);
+
     $offer_term = isset($_POST['bm_offer_term']) ? (int) wp_unslash($_POST['bm_offer_term']) : 0;
-    wp_set_object_terms($post_id, $offer_term ? [$offer_term] : [], 'dostawca_termin', false);
+    wp_set_object_terms($post_id, $offer_term ? [$offer_term] : [], 'oferta_termin', false);
 
     $offer_budget = isset($_POST['bm_offer_budget']) ? (int) wp_unslash($_POST['bm_offer_budget']) : 0;
-    wp_set_object_terms($post_id, $offer_budget ? [$offer_budget] : [], 'dostawca_budzet', false);
+    wp_set_object_terms($post_id, $offer_budget ? [$offer_budget] : [], 'oferta_budzet', false);
 }, 30);

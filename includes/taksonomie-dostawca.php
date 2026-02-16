@@ -8,12 +8,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 add_action( 'init', function() {
 
-    $post_types = [ 'dostawca', 'dostawca_oferta' ];
+    $supplier_post_types = [ 'dostawca' ];
+    $offer_post_types    = [ 'dostawca_oferta' ];
 
     // Kategorie usług
     register_taxonomy(
         'dostawca_kategoria',
-        $post_types,
+        $supplier_post_types,
         [
             'labels' => [
                 'name'          => 'Kategorie usług',
@@ -32,7 +33,7 @@ add_action( 'init', function() {
     // Doświadczenie w branżach
     register_taxonomy(
         'dostawca_branza',
-        $post_types,
+        $supplier_post_types,
         [
             'labels' => [
                 'name'          => 'Doświadczenie w branżach',
@@ -50,7 +51,7 @@ add_action( 'init', function() {
     // Lokalizacje
     register_taxonomy(
         'dostawca_lokalizacja',
-        $post_types,
+        $supplier_post_types,
         [
             'labels' => [
                 'name'          => 'Lokalizacje',
@@ -68,7 +69,7 @@ add_action( 'init', function() {
     // Terminy (czas realizacji)
     register_taxonomy(
         'dostawca_termin',
-        $post_types,
+        $supplier_post_types,
         [
             'labels' => [
                 'name'          => 'Terminy realizacji',
@@ -86,7 +87,7 @@ add_action( 'init', function() {
     // Budżety
     register_taxonomy(
         'dostawca_budzet',
-        $post_types,
+        $supplier_post_types,
         [
             'labels' => [
                 'name'          => 'Budżety',
@@ -98,6 +99,78 @@ add_action( 'init', function() {
             'show_ui'           => true,
             'show_in_rest'      => true,
             'rewrite'           => [ 'slug' => 'budzet-dostawcy' ],
+        ]
+    );
+
+    // OFERTY: kategorie
+    register_taxonomy(
+        'oferta_kategoria',
+        $offer_post_types,
+        [
+            'labels' => [
+                'name'          => 'Kategorie Ofert',
+                'singular_name' => 'Kategoria Oferty',
+            ],
+            'public'            => true,
+            'hierarchical'      => true,
+            'show_admin_column' => true,
+            'show_ui'           => true,
+            'show_in_rest'      => true,
+            'rewrite'           => [ 'slug' => 'kategoria-oferty' ],
+        ]
+    );
+
+    // OFERTY: specjalizacje
+    register_taxonomy(
+        'oferta_specjalizacja',
+        $offer_post_types,
+        [
+            'labels' => [
+                'name'          => 'Specjalizacje Ofert',
+                'singular_name' => 'Specjalizacja Oferty',
+            ],
+            'public'            => true,
+            'hierarchical'      => true,
+            'show_admin_column' => true,
+            'show_ui'           => true,
+            'show_in_rest'      => true,
+            'rewrite'           => [ 'slug' => 'specjalizacja-oferty' ],
+        ]
+    );
+
+    // OFERTY: terminy
+    register_taxonomy(
+        'oferta_termin',
+        $offer_post_types,
+        [
+            'labels' => [
+                'name'          => 'Terminy Ofert',
+                'singular_name' => 'Termin Oferty',
+            ],
+            'public'            => true,
+            'hierarchical'      => false,
+            'show_admin_column' => true,
+            'show_ui'           => true,
+            'show_in_rest'      => true,
+            'rewrite'           => [ 'slug' => 'termin-oferty' ],
+        ]
+    );
+
+    // OFERTY: budżety/stawki
+    register_taxonomy(
+        'oferta_budzet',
+        $offer_post_types,
+        [
+            'labels' => [
+                'name'          => 'Budżety Ofert',
+                'singular_name' => 'Budżet Oferty',
+            ],
+            'public'            => true,
+            'hierarchical'      => false,
+            'show_admin_column' => true,
+            'show_ui'           => true,
+            'show_in_rest'      => true,
+            'rewrite'           => [ 'slug' => 'budzet-oferty' ],
         ]
     );
 

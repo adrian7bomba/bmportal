@@ -67,10 +67,4 @@ add_action('init', function(){
     ]);
 }, 9);
 
-/* Powiązanie istniejących taksonomii z ofertą (gdy są zarejestrowane) */
-add_action('init', function(){
-    if (taxonomy_exists('dostawca_kategoria'))   register_taxonomy_for_object_type('dostawca_kategoria','dostawca_oferta');
-    if (taxonomy_exists('dostawca_lokalizacja')) register_taxonomy_for_object_type('dostawca_lokalizacja','dostawca_oferta');
-    if (taxonomy_exists('dostawca_termin'))      register_taxonomy_for_object_type('dostawca_termin','dostawca_oferta');
-    if (taxonomy_exists('dostawca_budzet'))      register_taxonomy_for_object_type('dostawca_budzet','dostawca_oferta');
-}, 20);
+/* Oferty mają dedykowane taksonomie `oferta_*` definiowane w taksonomie-dostawca.php */
